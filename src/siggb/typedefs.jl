@@ -23,6 +23,14 @@ end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
 
+# tells our functions which cofactor info to track
+const NONE = 0
+const PARTIAL = 1
+const FULL = 2
+struct ModuleTrack{WHICH}
+    tracked_indices::Vector{Bool}
+end
+
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
     sigmasks::Vector{MaskSig}
@@ -40,6 +48,9 @@ mutable struct Basis{N}
 
     monomials::Vector{Vector{MonIdx}}
     coefficients::Vector{Vector{Coeff}}
+
+    cofac_monomials::Vector{Vector{MonIdx}}
+    cofac_coefficients::Vector{Vector{Coeff}}
 
     is_red::Vector{Bool}
 
@@ -95,6 +106,11 @@ mutable struct MacaulayMatrix{N}
     # row coefficients
     coeffs::Vector{Vector{Coeff}}
 
+    # cofactors
+    row_to_cofac_row::Dict{Int, Int}
+    cofac_rows::Vector{Vector{MonIdx}}
+    cofac_coeffs::Vector{Vector{Coeff}}
+
     #= sizes info =#
     # total number of allocated rows
     size::Int
@@ -102,6 +118,11 @@ mutable struct MacaulayMatrix{N}
     nrows::Int
     # number of columns
     ncols::Int
+
+    # number of allocated cofac rows
+    cofacsize::Int
+    # filled cofacrows
+    ncofacrows::Int
 
     # for each i in toadd rows[i] should be added to basis/syzygies
     toadd::Vector{Int}

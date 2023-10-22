@@ -291,17 +291,24 @@ function initialize_matrix(::Val{N}) where {N}
     sig_order = Vector{Int}(undef, 0)
     col2hash = Vector{ColIdx}(undef, 0)
     coeffs = Vector{Vector{Coeff}}(undef, 0)
+    row_to_cofac_rows = Dict{Int, Int}()
+    cofac_rows = Vector{Vector{MonIdx}}(undef, 0)
+    cofac_coeffs = Vector{Vector{Coeff}}(undef, 0)
     toadd = Vector{Int}(undef, 0)
 
     size = 0
     nrows = 0
     ncols = 0
+    cofacsize = 0
+    ncofacrows = 0
     toadd_length = 0
 
     return MacaulayMatrix(rows, pivots, pivot_size,
                           sigs, parent_inds, sig_order,
-                          col2hash, coeffs, size, nrows,
-                          ncols, toadd, toadd_length)
+                          col2hash, coeffs, row_to_cofac_rows,
+                          cofac_rows, cofac_coeffs,
+                          size, nrows, ncols, cofacsize,
+                          ncofacrows, ncols, toadd, toadd_length)
 end
     
 # Refresh and initialize matrix for `npairs` elements
@@ -349,11 +356,8 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
 
     hsh = Base.hash(mult)
     poly = basis.monomials[basis_idx]
-    row = similar(basis.monomials[basis_idx])
-    check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))
-
-    s = basis.sigs[basis_idx]
-    lm = mul(mult, leading_monomial(basis, ht, basis_idx))
+    row = similar(poly)
+    check_enlarge_hashtable!(symbol_ht, length(poly))
 
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
@@ -365,4 +369,85 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
         matrix.nrows += 1
     end
     return first(matrix.rows[row_ind])
+end
+
+function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
+                                    basis::Basis,
+                                    basis_idx::Int,
+                                    symbol_ht::MonomialHashtable,
+                                    ht::MonomialHashtable,
+                                    mult::Monomial,
+                                    sig::Sig,
+                                    row_ind::Int,
+                                    cofac_track::ModuleTrack{NONE})
+    return
+end
+
+function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
+                                    basis::Basis,
+                                    basis_idx::Int,
+                                    symbol_ht::MonomialHashtable,
+                                    ht::MonomialHashtable,
+                                    mult::Monomial,
+                                    sig::Sig,
+                                    row_ind::Int,
+                                    cofac_track::ModuleTrack{PARTIAL})
+    ind = index(sig)
+    !cofac_track.tracked_indices[ind] && return
+
+    write_cofac_to_matrix_row!(matrix, basis, basis_idx,
+                               symbol_ht, ht, mult, sig, row_ind)
+    
+end
+
+function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
+                                    basis::Basis,
+                                    basis_idx::Int,
+                                    symbol_ht::MonomialHashtable,
+                                    ht::MonomialHashtable,
+                                    mult::Monomial,
+                                    sig::Sig,
+                                    row_ind::Int,
+                                    cofac_track::ModuleTrack{FULL})
+
+    write_cofac_to_matrix_row!(matrix, basis, basis_idx,
+                               symbol_ht, ht, mult, sig, row_ind)
+end
+
+function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
+                                    basis::Basis,
+                                    basis_idx::Int,
+                                    symbol_ht::MonomialHashtable,
+                                    ht::MonomialHashtable,
+                                    mult::Monomial,
+                                    sig::Sig,
+                                    row_ind::Int)
+    resized = false
+    if iszero(matrix.cofacsize)
+        matrix.cofacsize = 1
+        resized = true
+    elseif matrix.cofacsize == matrix.ncofacrows
+        matrix.cofacsize *= 2
+        resized = true
+    end
+    if resized
+        resize!(matrix.cofac_rows, matrix.cofacsize)
+        resize!(matrix.cofac_coeffs, matrix.cofacsize)
+    end
+
+    hsh = Base.hash(mult)
+    poly = basis.cofac_monomials[basis_idx]
+    row = similar(poly)
+    check_enlarge_hashtable!(symbol_ht, length(poly))
+
+    @inbounds matrix.rows[matrix.ncofacrows] =
+        insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
+                                              ht, symbol_ht)
+
+    matrix.row_to_cofac_row[row_ind] = matrix.ncofacrows
+
+    @inbounds matrix.cofac_coeffs[matrix.ncofacrows] =
+        basis.cofac_coefficients[basis_idx]
+    matrix.ncofacrows += 1
+    return
 end
