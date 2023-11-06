@@ -180,9 +180,13 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     # cofactor tracking
     cofac_track = ModuleTrack{PARTIAL}(trues(sysl))
 
+    # index map
+    ind_map = collect(1:sysl)
+
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, cofac_track, degbound = degbound)
+        siggb!(basis, pairset, basis_ht, char, shift, cofac_track, ind_map,
+               degbound = degbound)
     end
 
     # output
@@ -205,7 +209,8 @@ function siggb!(basis::Basis{N},
                 basis_ht::MonomialHashtable,
                 char::Val{Char},
                 shift::Val{Shift},
-                cofac_track::ModuleTrack;
+                cofac_track::ModuleTrack,
+                ind_map::Vector{Int};
                 degbound = 0) where {N, Char, Shift}
 
     while !iszero(pairset.load)
@@ -217,13 +222,14 @@ function siggb!(basis::Basis{N},
         cofac_symbol_ht = initialize_secondary_hash_table(basis_ht)
 
         select_normal!(pairset, basis, matrix, basis_ht, symbol_ht,
-                       cofac_symbol_ht, cofac_track)
+                       cofac_symbol_ht, cofac_track, ind_map)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     cofac_symbol_ht, cofac_track)
-        finalize_matrix!(matrix, symbol_ht, cofac_symbol_ht)
+                     cofac_symbol_ht, cofac_track, ind_map)
+        finalize_matrix!(matrix, symbol_ht, cofac_symbol_ht, ind_map)
         echelonize!(matrix, char, shift)
 
-        update_basis!(basis, matrix, pairset, symbol_ht, cofac_symbol_ht, basis_ht)
+        update_basis!(basis, matrix, pairset, symbol_ht,
+                      cofac_symbol_ht, basis_ht, ind_map)
     end
 end
 

@@ -74,11 +74,12 @@ end
     end
 end
 
-function lt_pot(a::Sig, b::Sig)
+# DPOT comparison
+function lt_pot(index_map::Vector{Int}, a::Sig, b::Sig)
     if index(a) == index(b)
         return lt_drl(a[2], b[2])
     else
-        return index(a) < index(b)
+        return @inbounds index_map[index(a)] < @inbounds index_map[index(b)]
     end
 end
 

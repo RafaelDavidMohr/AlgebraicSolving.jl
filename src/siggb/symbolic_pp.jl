@@ -4,7 +4,8 @@ function select_normal!(pairset::Pairset{N},
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable,
                         cofac_symbol_ht::MonomialHashtable,
-                        cofac_track::ModuleTrack) where N
+                        cofac_track::ModuleTrack,
+                        ind_map::Vector{Int}) where N
 
     # sort pairset
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
@@ -90,10 +91,10 @@ function select_normal!(pairset::Pairset{N},
                 @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
-                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig)
-                        !lt_pot(pair2.bot_sig, curr_top_sig) && continue
+                    if iszero(reducer_ind) || lt_pot(ind_map, pair2.bot_sig, reducer_sig)
                         new_red = false
                         if !iszero(pair2.bot_index)
+                            !lt_pot(ind_map, pair2.bot_sig, curr_top_sig) && continue
                             rewriteable_basis(basis, pair2.bot_index,
                                               pair2.bot_sig,
                                               pair2.bot_sig_mask) && continue
@@ -165,7 +166,8 @@ function symbolic_pp!(basis::Basis{N},
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
                       cofac_symbol_ht::MonomialHashtable,
-                      cofac_track::ModuleTrack) where N
+                      cofac_track::ModuleTrack,
+                      ind_map::Vector{Int}) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -221,7 +223,7 @@ function symbolic_pp!(basis::Basis{N},
             # found_reducer = true
 
             # check if new reducer sig is smaller than possible previous
-            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
+            if !iszero(red_ind) && lt_pot(ind_map, mul_red_sig, mul_cand_sig)
                 j += 1
                 @goto target
             end
@@ -267,7 +269,8 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable,
-                          cofac_symbol_ht::MonomialHashtable)
+                          cofac_symbol_ht::MonomialHashtable,
+                          ind_map::Vector{Int})
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -296,7 +299,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
     sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
-              lt = (sig1, sig2) -> lt_pot(sig1, sig2))
+              lt = (sig1, sig2) -> lt_pot(ind_map, sig1, sig2))
 end
 
 # TODO: later to optimize: mem allocations for matrix
