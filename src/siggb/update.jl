@@ -6,6 +6,7 @@ function update_basis!(basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
+                       cofac_symbol_ht::MonomialHashtable,
                        basis_ht::MonomialHashtable) where N
 
     new_basis_c = 0
@@ -69,6 +70,8 @@ function update_basis!(basis::Basis,
                 resize!(basis.lm_masks, basis.basis_size)
                 resize!(basis.monomials, basis.basis_size)
                 resize!(basis.coefficients, basis.basis_size)
+                resize!(basis.cofac_monomials, basis.basis_size)
+                resize!(basis.cofac_coefficients, basis.basis_size)
                 resize!(basis.is_red, basis.basis_size)
             end
             
@@ -103,6 +106,14 @@ function update_basis!(basis::Basis,
                                         basis_ht.ndivbits)
             basis.monomials[l] = row
             basis.coefficients[l] = matrix.coeffs[i]
+
+            cofac_row_ind = matrix.row_to_cofac_row[i]
+            cofac_row = matrix.cofac_rows[cofac_row_ind]
+            insert_in_basis_hash_table_pivots!(cofac_row, basis_ht, cofac_symbol_ht)
+            cofac_coeffs = matrix.cofac_coeffs[cofac_row_ind]
+            basis.cofac_monomials[l] = cofac_row
+            basis.cofac_coefficients[l] = cofac_coeffs
+
             basis.basis_load = l
 
             # build new pairs

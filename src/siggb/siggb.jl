@@ -97,12 +97,14 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     lm_masks = Vector{DivMask}(undef, init_basis_size)
     monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, init_basis_size)
+    cofac_monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
+    cofac_coefficients = Vector{Vector{Coeff}}(undef, init_basis_size)
     is_red = Vector{Bool}(undef, init_basis_size)
     syz_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
     syz_masks = Vector{MaskSig}(undef, init_syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
-                  lm_masks, monomials, coeffs, is_red,
-                  syz_sigs, syz_masks, degs, sysl,
+                  lm_masks, monomials, coeffs, cofac_monomials, cofac_coefficients,
+                  is_red, syz_sigs, syz_masks, degs, sysl,
                   init_basis_size, sysl + 1, 0, init_syz_size)
 
     # root node
@@ -153,6 +155,12 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.rewrite_nodes[i+1] = [-1, 1]
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
+
+        cofac_mon = monomial(sig)
+        eidx = insert_in_hash_table!(basis_ht, cofac_mon)
+        basis.cofac_monomials[i] = [eidx]
+        basis.cofac_coefficients[i] = [one(Coeff)]
+        
         basis.is_red[i] = false
 
         # add unitvector as pair
@@ -169,9 +177,12 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
+    # cofactor tracking
+    cofac_track = ModuleTrack{PARTIAL}(trues(sysl))
+
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, degbound = degbound)
+        siggb!(basis, pairset, basis_ht, char, shift, cofac_track, degbound = degbound)
     end
 
     # output
@@ -199,7 +210,8 @@ function siggb!(basis::Basis{N},
                 pairset::Pairset,
                 basis_ht::MonomialHashtable,
                 char::Val{Char},
-                shift::Val{Shift};
+                shift::Val{Shift},
+                cofac_track::ModuleTrack;
                 degbound = 0) where {N, Char, Shift}
 
     while !iszero(pairset.load)
@@ -208,13 +220,16 @@ function siggb!(basis::Basis{N},
         end
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
+        cofac_symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
+        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht,
+                       cofac_symbol_ht, cofac_track)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                     cofac_symbol_ht, cofac_track)
         finalize_matrix!(matrix, symbol_ht)
         echelonize!(matrix, char, shift)
 
-        update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+        update_basis!(basis, matrix, pairset, symbol_ht, cofac_symbol_ht, basis_ht)
     end
 end
 

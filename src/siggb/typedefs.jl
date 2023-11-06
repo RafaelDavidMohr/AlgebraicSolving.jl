@@ -26,9 +26,8 @@ const MaskSig = Tuple{SigIndex, DivMask}
 # tells our functions which cofactor info to track
 const NONE = 0
 const PARTIAL = 1
-const FULL = 2
 struct ModuleTrack{WHICH}
-    tracked_indices::Vector{Bool}
+    tracked_indices::BitVector
 end
 
 mutable struct Basis{N}

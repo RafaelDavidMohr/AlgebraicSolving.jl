@@ -2,7 +2,9 @@ function select_normal!(pairset::Pairset{N},
                         basis::Basis{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
-                        symbol_ht::MonomialHashtable) where N
+                        symbol_ht::MonomialHashtable,
+                        cofac_symbol_ht::MonomialHashtable,
+                        cofac_track::ModuleTrack) where N
 
     # sort pairset
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
@@ -116,6 +118,11 @@ function select_normal!(pairset::Pairset{N},
                                                     reducer_ind,
                                                     symbol_ht, ht, mult,
                                                     reducer_sig)
+                    write_cofac_to_matrix_row!(matrix, basis,
+                                               reducer_ind, cofac_symbol_ht,
+                                               ht, mult, reducer_sig,
+                                               cofac_track)
+                                               
                     # set pivot
                     resize_pivots!(matrix, symbol_ht)
                     matrix.pivots[lead_idx] = matrix.nrows
@@ -129,6 +136,9 @@ function select_normal!(pairset::Pairset{N},
                 l_idx = write_to_matrix_row!(matrix, basis, rewr_ind,
                                              symbol_ht, ht, mult,
                                              curr_top_sig)
+                write_cofac_to_matrix_row!(matrix, basis, rewr_ind,
+                                           cofac_symbol_ht, ht, mult,
+                                           curr_top_sig, cofac_track)
                 added_to_matrix += 1
                 if iszero(pair.bot_index)
                     matrix.toadd[matrix.toadd_length+1] = matrix.nrows
@@ -153,7 +163,9 @@ end
 function symbolic_pp!(basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
-                      symbol_ht::MonomialHashtable) where N
+                      symbol_ht::MonomialHashtable,
+                      cofac_symbol_ht::MonomialHashtable,
+                      cofac_track::ModuleTrack) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -242,6 +254,10 @@ function symbolic_pp!(basis::Basis{N},
                                                       red_ind, symbol_ht,
                                                       ht, mm,
                                                       mul_red_sig)
+            write_cofac_to_matrix_row!(matrix, basis,
+                                       red_ind, cofac_symbol_ht,
+                                       ht, mm, mul_red_sig,
+                                       cofac_track)
             resize_pivots!(matrix, symbol_ht)
             matrix.pivots[lead_idx] = matrix.nrows
         end
@@ -284,16 +300,22 @@ end
 # helper functions
 function initialize_matrix(::Val{N}) where {N}
     rows = Vector{Vector{MonIdx}}(undef, 0)
+
     pivots = Vector{Int}(undef, 0)
     pivot_size = 0
+
     sigs = Vector{Sig{N}}(undef, 0)
     parent_inds = Vector{Int}(undef, 0)
     sig_order = Vector{Int}(undef, 0)
+
     col2hash = Vector{ColIdx}(undef, 0)
+
     coeffs = Vector{Vector{Coeff}}(undef, 0)
+
     row_to_cofac_rows = Dict{Int, Int}()
     cofac_rows = Vector{Vector{MonIdx}}(undef, 0)
     cofac_coeffs = Vector{Vector{Coeff}}(undef, 0)
+
     toadd = Vector{Int}(undef, 0)
 
     size = 0
@@ -306,9 +328,9 @@ function initialize_matrix(::Val{N}) where {N}
     return MacaulayMatrix(rows, pivots, pivot_size,
                           sigs, parent_inds, sig_order,
                           col2hash, coeffs, row_to_cofac_rows,
-                          cofac_rows, cofac_coeffs,
-                          size, nrows, ncols, cofacsize,
-                          ncofacrows, ncols, toadd, toadd_length)
+                          cofac_rows, cofac_coeffs, size,
+                          nrows, ncols, cofacsize,
+                          ncofacrows, toadd, toadd_length)
 end
     
 # Refresh and initialize matrix for `npairs` elements
@@ -351,9 +373,9 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
                               symbol_ht::MonomialHashtable,
                               ht::MonomialHashtable,
                               mult::Monomial,
-                              sig::Sig,
-                              row_ind=matrix.nrows+1)
+                              sig::Sig)
 
+    row_ind = matrix.nrows+1
     hsh = Base.hash(mult)
     poly = basis.monomials[basis_idx]
     row = similar(poly)
@@ -378,7 +400,6 @@ function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
                                     ht::MonomialHashtable,
                                     mult::Monomial,
                                     sig::Sig,
-                                    row_ind::Int,
                                     cofac_track::ModuleTrack{NONE})
     return
 end
@@ -390,38 +411,10 @@ function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
                                     ht::MonomialHashtable,
                                     mult::Monomial,
                                     sig::Sig,
-                                    row_ind::Int,
                                     cofac_track::ModuleTrack{PARTIAL})
     ind = index(sig)
     !cofac_track.tracked_indices[ind] && return
 
-    write_cofac_to_matrix_row!(matrix, basis, basis_idx,
-                               symbol_ht, ht, mult, sig, row_ind)
-    
-end
-
-function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
-                                    basis::Basis,
-                                    basis_idx::Int,
-                                    symbol_ht::MonomialHashtable,
-                                    ht::MonomialHashtable,
-                                    mult::Monomial,
-                                    sig::Sig,
-                                    row_ind::Int,
-                                    cofac_track::ModuleTrack{FULL})
-
-    write_cofac_to_matrix_row!(matrix, basis, basis_idx,
-                               symbol_ht, ht, mult, sig, row_ind)
-end
-
-function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
-                                    basis::Basis,
-                                    basis_idx::Int,
-                                    symbol_ht::MonomialHashtable,
-                                    ht::MonomialHashtable,
-                                    mult::Monomial,
-                                    sig::Sig,
-                                    row_ind::Int)
     resized = false
     if iszero(matrix.cofacsize)
         matrix.cofacsize = 1
@@ -440,13 +433,14 @@ function write_cofac_to_matrix_row!(matrix::MacaulayMatrix,
     row = similar(poly)
     check_enlarge_hashtable!(symbol_ht, length(poly))
 
-    @inbounds matrix.rows[matrix.ncofacrows] =
+    row_ind = matrix.ncofacrows + 1
+    @inbounds matrix.cofac_rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
                                               ht, symbol_ht)
 
-    matrix.row_to_cofac_row[row_ind] = matrix.ncofacrows
+    matrix.row_to_cofac_row[matrix.nrows] = row_ind
 
-    @inbounds matrix.cofac_coeffs[matrix.ncofacrows] =
+    @inbounds matrix.cofac_coeffs[row_ind] =
         basis.cofac_coefficients[basis_idx]
     matrix.ncofacrows += 1
     return
