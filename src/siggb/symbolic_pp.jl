@@ -266,11 +266,14 @@ function symbolic_pp!(basis::Basis{N},
 end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
-                          symbol_ht::MonomialHashtable)
+                          symbol_ht::MonomialHashtable,
+                          cofac_symbol_ht::MonomialHashtable)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
     matrix.ncols = ncols
+    ncofaccols = cofac_symbol_ht.load
+    matrix.ncofaccols = ncofaccols
 
     col2hash = Vector{ColIdx}(undef, ncols)
     @inbounds for i in 1:ncols
@@ -323,6 +326,7 @@ function initialize_matrix(::Val{N}) where {N}
     ncols = 0
     cofacsize = 0
     ncofacrows = 0
+    ncofaccols = 0
     toadd_length = 0
 
     return MacaulayMatrix(rows, pivots, pivot_size,
@@ -330,7 +334,8 @@ function initialize_matrix(::Val{N}) where {N}
                           col2hash, coeffs, row_to_cofac_rows,
                           cofac_rows, cofac_coeffs, size,
                           nrows, ncols, cofacsize,
-                          ncofacrows, toadd, toadd_length)
+                          ncofacrows, ncofaccols,
+                          toadd, toadd_length)
 end
     
 # Refresh and initialize matrix for `npairs` elements

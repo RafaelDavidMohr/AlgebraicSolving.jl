@@ -189,19 +189,13 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     eltp = typeof(first(sys))
     outp = Tuple{Tuple{Int, eltp}, eltp}[]
     @inbounds for i in basis.basis_offset:basis.basis_load
-        exps = [basis_ht.exponents[m].exps for m in basis.monomials[i]]
-        ctx = MPolyBuildCtx(R)
-        for (e, c) in zip(exps, basis.coefficients[i])
-            push_term!(ctx, c, Vector{Int}(e))
-        end
-        pol = finish(ctx)
+        pol = convert_to_pol(R, basis_ht, basis.monomials[i], basis.coefficients[i])
 
+        cofac_pol = convert_to_pol(R, basis_ht, basis.cofac_monomials[i],
+                                   basis.cofac_coefficients[i])
         s = basis.sigs[i]
-        ctx = MPolyBuildCtx(R)
-        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
-        sig = (Int(index(s)), finish(ctx))
 
-        push!(outp, (sig, pol))
+        push!(outp, ((Int(index(s)), cofac_pol), pol))
     end
     return outp
 end
@@ -226,7 +220,7 @@ function siggb!(basis::Basis{N},
                        cofac_symbol_ht, cofac_track)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                      cofac_symbol_ht, cofac_track)
-        finalize_matrix!(matrix, symbol_ht)
+        finalize_matrix!(matrix, symbol_ht, cofac_symbol_ht)
         echelonize!(matrix, char, shift)
 
         update_basis!(basis, matrix, pairset, symbol_ht, cofac_symbol_ht, basis_ht)
@@ -238,6 +232,19 @@ end
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
+end
+
+function convert_to_pol(R::MPolyRing,
+                        ht::MonomialHashtable,
+                        exps_inds::Vector{MonIdx},
+                        cfs::Vector{Coeff})
+    
+    exps = [ht.exponents[m].exps for m in exps_inds]
+    ctx = MPolyBuildCtx(R)
+    for (e, c) in zip(exps, cfs)
+        push_term!(ctx, c, Vector{Int}(e))
+    end
+    return finish(ctx)
 end
 
 # homogenize w.r.t. the last variable

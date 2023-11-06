@@ -122,6 +122,8 @@ mutable struct MacaulayMatrix{N}
     cofacsize::Int
     # filled cofacrows
     ncofacrows::Int
+    # number of cofac columns
+    ncofaccols::Int
 
     # for each i in toadd rows[i] should be added to basis/syzygies
     toadd::Vector{Int}
