@@ -20,6 +20,7 @@ include("affine_cells.jl")
 include("interfaces.jl")
 include("helpers.jl")
 include("monomial_diagram.jl")
+include("multimodular.jl")
 
 
 #---------------- user functions --------------------#
