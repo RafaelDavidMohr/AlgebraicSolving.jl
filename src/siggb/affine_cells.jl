@@ -85,7 +85,7 @@ function split(X::LocClosedSet, g::MPolyRingElem)
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb), X_gb))
         isempty(H_rand) && continue
-        gbs = remove(X_gb, H_rand, known_eqns = [g])
+        gbs = (el -> el[2]).(remove(X_gb, H_rand, known_eqns = [g]))
         for gb in gbs
             push!(hull_gbs, gb)
         end
@@ -102,7 +102,7 @@ function remove(gb::Vector{P},
                 H::Vector{P};
                 known_eqns::Vector{P}=P[]) where P
 
-    res = Vector{P}[]
+    res = Tuple{P, Vector{P}}[]
     isempty(H) && return res
 
     R = parent(first(gb))
@@ -113,7 +113,7 @@ function remove(gb::Vector{P},
         @info "is empty"
         return remove(gb, H[2:end], known_eqns=known_eqns)
     end
-    push!(res, gb1)
+    push!(res, (h, gb1))
     tim1 = @elapsed G = filter(!iszero,
                                normal_form(random_lin_combs(gb1), gb))
     if isempty(G)

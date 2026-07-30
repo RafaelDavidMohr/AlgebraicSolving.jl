@@ -240,3 +240,19 @@ mutable struct Timings
     time_for_mdd::Float32
     time_for_membership::Float32
 end
+
+# for rational reconstruction during equidim
+
+mutable struct ReconstructPol
+    exps::Vector{Vector{Exp}}
+    coeff_cands::Vector{QQFieldElem}
+    mod_coeffs::Vector{Int}
+    is_stable::Bool
+end
+
+mutable struct ReconstructRegistry
+    pols::Vector{ReconstructPol}
+    curr_ind::Int
+    primes::Vector{Int32}
+    current_prime::Int32
+end
