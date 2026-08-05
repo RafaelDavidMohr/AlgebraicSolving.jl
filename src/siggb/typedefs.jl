@@ -179,6 +179,7 @@ end
 
 abstract type TracerMatrix end
 
+# Dummy type if no tracing is needed
 struct NoTracerMatrix <: TracerMatrix end
 
 # struct to remember the row reductions we did
@@ -225,8 +226,8 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{T}
     codim_upper_bound::Int
     gbs::Vector{Vector{T}}
+    ineqns::Vector{Vector{Int}}
 end
-
 
 # for benchmarking
 mutable struct Timings
@@ -250,9 +251,14 @@ mutable struct ReconstructPol
     is_stable::Bool
 end
 
-mutable struct ReconstructRegistry
+abstract type Registry end
+
+mutable struct ReconstructRegistry <: Registry
     pols::Vector{ReconstructPol}
     curr_ind::Int
     primes::Vector{Int32}
     current_prime::Int32
 end
+
+# dummy type if we are not doing rational reconstruction
+struct NoRegistry <: Registry end

@@ -7,6 +7,7 @@ function does_not_match(pr::ReconstructPol, p::FqMPolyRingElem)
 end
 
 function ReconstructPol(p::FqMPolyRingElem)
+    p *= leading_coefficient(p)^(-1)
     exps = collect(exponent_vectors(p))
     mod_coeffs = lift_to_int.(collect(coefficients(p)))
     coeff_cands = (c -> QQ(c)).(mod_coeffs)
@@ -17,16 +18,21 @@ end
 function update!(reg::ReconstructRegistry,
                  new_pol::FqMPolyRingElem)
 
-    if length(reg.pols) < reg.curr_ind
+    ri = reg.curr_ind
+    
+    if length(reg.pols) < ri
         push!(reg.pols, ReconstructPol(new_pol))
         reg.curr_ind += 1
-        return
+        return ri
     end
 
-    pr = reg.pols[reg.curr_ind]
+    pr = reg.pols[ri]
     does_not_match(pr, new_pol) && error("Bad prime during multi-modular computation.")
 
-    pr.is_stable && return
+    if pr.is_stable
+        reg.curr_ind += 1
+        return ri
+    end
 
     pprod = prod(reg.primes)
     curr_p = reg.current_prime
@@ -48,6 +54,10 @@ function update!(reg::ReconstructRegistry,
         i += 1
     end
     pr.is_stable = all_is_stable
+    reg.curr_ind += 1
+    return ri
 end
 
-    
+function update!(reg::NoRegistry, p::FqMPolyRingElem)
+    return 0
+end
