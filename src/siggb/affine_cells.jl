@@ -50,10 +50,11 @@ end
 function add_inequation!(X::LocClosedSet, h::P, r::Registry;
                          known_zds=P[]::Vector{P}) where P
     
+    h *= leading_coefficient(h)^(-1)
     ri = update!(r, h)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
-        ri != 0 && push!(X.ineqns[i], ri)
+        push!(X.ineqns[i], ri)
     end
 end
 
@@ -100,11 +101,11 @@ function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
 
     todel = findall(gb -> one(R) in gb, X_min_g.gbs)
     deleteat!(X_min_g.gbs, todel)
-    !isempty(X_min_g.ineqns) && deleteat!(X_min_g.ineqns, todel)
+    deleteat!(X_min_g.ineqns, todel)
 
     todel = findall(gb -> one(R) in gb, X_hull_g.gbs)
     deleteat!(X_hull_g.gbs, todel)
-    !isempty(X_hull_g.ineqns) && deleteat!(X_hull_g.ineqns, todel)
+    deleteat!(X_hull_g.ineqns, todel)
 
     return X_hull_g, X_min_g
 end
@@ -125,8 +126,9 @@ function remove!(gb::Vector{P},
         @info "is empty"
         return remove!(gb, H[2:end], r, known_eqns=known_eqns)
     end
+    h *= leading_coefficient(h)^(-1)
     ri = update!(r, h)
-    iszero(ri) ? push!(res, (gb1, Int[])) : push!(res, (gb1, [ri]))
+    push!(res, (gb1, [ri]))
     tim1 = @elapsed G = filter(!iszero,
                                normal_form(random_lin_combs(gb1), gb))
     if isempty(G)
