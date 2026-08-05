@@ -146,6 +146,62 @@ function remove!(gb::Vector{P},
     return res
 end
 
+# -------------------------------------- #
+# --- user level locally closed sets --- #
+# -------------------------------------- #
+
+function Base.show(io::IO, ::MIME"text/plain", X::LocallyClosedSet)
+    str = "V("
+    for (i, eqn) in enumerate(X.eqns)
+        str *= i == length(X.eqns) ? "$(eqn))" : "$(eqn), "
+    end
+    isempty(X.ineqns) && print(io, str)
+
+    str *= " \\ V("
+    for (i, ineqn) in enumerate(X.ineqns)
+        ineqn_repr = if isone(length(ineqn)) || isone(length(X.ineqns))
+            "$(ineqn)"
+        else
+            "($(ineqn))"
+        end
+        str *= i == length(X.ineqns) ? "$(ineqn_repr))" : "$(ineqn_repr) * "
+    end
+
+    print(io, str)
+end
+
+# convert internal cells to user level output cells
+function get_output_cells(cell::LocClosedSet,
+                          R::FqMPolyRing,
+                          input_eqns::Vector{FqMPolyRingElem},
+                          r::ModularRegistry)
+
+    res = LocallyClosedSet{FqMPolyRingElem}[]
+    eqns = _dehomogenize(cell.seq, R)
+    for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
+        ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
+        gb_dehom = _dehomogenize(gb, R)
+        push!(res, LocallyClosedSet(eqns, ineqns, gb_dehom))
+    end
+    return res
+end
+
+# convert internal cells to user level output cells
+function get_output_cells(cell::LocClosedSet,
+                          R::QQMPolyRing,
+                          input_eqns::Vector{QQMPolyRingElem},
+                          r::ReconstructRegistry)
+
+    res = LocallyClosedSet{FqMPolyRingElem}[]
+    S = ring(cell)
+    eqns = filter(f -> reduce_mod_p(f, S) in cell.seq, input_eqns)
+    for ineqninds in cell.ineqns
+        ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
+        push!(res, LocallyClosedSet(eqns, ineqns, QQMPolyRingElem[]))
+    end
+    return res
+end
+
 # ------------------------ #
 # --- helper functions --- #
 # ------------------------ #

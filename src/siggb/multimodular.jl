@@ -1,4 +1,40 @@
+function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRingElem)
+
+    F = base_ring(R)
+    ctx = MPolyBuildCtx(R)
+    for (cf, exp) in zip(coefficients(f), exponent_vectors(f))
+        cfP = F(numerator(cf)) * F(denominator(cf))^(-1)
+        push_term!(ctx, cfP, exp)
+    end
+    return finish(ctx)
+end
+
 lift_to_int(a::FqFieldElem) = Int(lift(ZZ, a))
+
+function is_finished(r::ReconstructRegistry)
+    !isempty(r.pols) && all(p -> p.is_stable, r.pols)
+end
+
+function get_pol(r::ReconstructRegistry, i::Int)
+    rp = r.pols[i]
+    ctx = MPolyBuildCtx(r.R)
+    for (cf, exp) in zip(rp.coeff_cands, rp.exps)
+        push_term!(ctx, cf, exp)
+    end
+    return finish(ctx)
+end
+
+function get_pols(r::ReconstructRegistry, inds::Vector{Int})
+    return [get_pol(r, i) for i in inds]
+end
+
+function is_finished(r::ModularRegistry)
+    !isempty(r.pols)
+end
+
+function get_pols(r::ModularRegistry, inds::Vector{Int})
+    return r.pols[inds]
+end
 
 # TODO:adjust
 function does_not_match(pr::ReconstructPol, p::FqMPolyRingElem)

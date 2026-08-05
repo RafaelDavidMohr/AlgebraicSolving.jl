@@ -254,6 +254,7 @@ end
 abstract type Registry end
 
 mutable struct ReconstructRegistry <: Registry
+    R::QQMPolyRing
     pols::Vector{ReconstructPol}
     curr_ind::Int
     primes::Vector{Int32}
@@ -262,4 +263,11 @@ end
 
 mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
     pols::Vector{T}
+end
+
+# for user level output of equidimensional decomposition
+struct LocallyClosedSet{T <: MPolyRingElem}
+    eqns::Vector{T}
+    ineqns::Vector{T}
+    gb::Vector{T}
 end

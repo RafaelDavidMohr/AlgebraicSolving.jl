@@ -1,29 +1,3 @@
-struct LocallyClosedSet{T <: MPolyRingElem}
-    eqns::Vector{T}
-    ineqns::Vector{T}
-    gb::Vector{T}
-end
-
-function Base.show(io::IO, ::MIME"text/plain", X::LocallyClosedSet)
-    str = "V("
-    for (i, eqn) in enumerate(X.eqns)
-        str *= i == length(X.eqns) ? "$(eqn))" : "$(eqn), "
-    end
-    isempty(X.ineqns) && print(io, str)
-
-    str *= " \\ V("
-    for (i, ineqn) in enumerate(X.ineqns)
-        ineqn_repr = if isone(length(ineqn)) || isone(length(X.ineqns))
-            "$(ineqn)"
-        else
-            "($(ineqn))"
-        end
-        str *= i == length(X.ineqns) ? "$(ineqn_repr))" : "$(ineqn_repr) * "
-    end
-
-    print(io, str)
-end
-
 @doc Markdown.doc"""
     equations(X::LocallyClosedSet)
 
@@ -93,16 +67,14 @@ function equidimensional_decomposition(I::Ideal{T};
     Fhom = homogenize(F)
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
-    cells = _sig_decomp(Fhom, r, info_level = info_level)
+    cells = LocClosedSet{FqMPolyRingElem}[]
+    while !is_finished(r)
+        cells = _sig_decomp(Fhom, r, info_level = info_level)
+    end
     res = LocallyClosedSet{T}[]
     R = parent(I)
     for cell in cells
-        eqns = _dehomogenize(cell.seq, R)
-        for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
-            ineqns = unique(_dehomogenize(r.pols[ineqninds], R))
-            gb_dehom = _dehomogenize(gb, R)
-            push!(res, LocallyClosedSet(eqns, ineqns, gb_dehom))
-        end
+        append!(res, get_output_cells(cell, R, F, r))
     end
     return res
 end
