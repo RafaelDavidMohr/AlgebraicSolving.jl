@@ -88,7 +88,7 @@ function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
-        H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb), X_gb))
+        H_rand = filter(!iszero, normal_form(r <: ModularRegistry ? random_lin_combs(col_gb) : col_gb, X_gb))
         isempty(H_rand) && continue
         gbsineqns = remove!(X_gb, H_rand, r, known_eqns = [g])
         for (gb, gb_ineqns) in gbsineqns
@@ -130,7 +130,7 @@ function remove!(gb::Vector{P},
     ri = update!(r, h)
     push!(res, (gb1, [ri]))
     tim1 = @elapsed G = filter(!iszero,
-                               normal_form(random_lin_combs(gb1), gb))
+                               normal_form(r <: ModularRegistry ? random_lin_combs(gb1) : gb1, gb))
     if isempty(G)
         return res
     end
