@@ -260,5 +260,6 @@ mutable struct ReconstructRegistry <: Registry
     current_prime::Int32
 end
 
-# dummy type if we are not doing rational reconstruction
-struct NoRegistry <: Registry end
+mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
+    pols::Vector{T}
+end

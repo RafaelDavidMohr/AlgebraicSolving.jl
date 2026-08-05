@@ -58,6 +58,7 @@ function update!(reg::ReconstructRegistry,
     return ri
 end
 
-function update!(reg::NoRegistry, p::FqMPolyRingElem)
-    return 0
+function update!(reg::ModularRegistry{T}, p::T) where T
+    push!(reg.pols, p)
+    return length(reg.pols)
 end
