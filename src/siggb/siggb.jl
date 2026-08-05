@@ -241,8 +241,9 @@ function _sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEle
     result = with_logger(logger) do
         R = parent(first(sys))
         timer = new_timer()
+        r = NoRegistry()
         lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
-                              tags, ind_order, tr, R, timer)
+                              tags, ind_order, tr, R, timer, r)
         @info timer
         return lc_sets
     end
@@ -258,7 +259,8 @@ function sig_decomp!(basis::Basis{N},
                      ind_order::IndOrder,
                      tr::SigTracer,
                      R::MPolyRing,
-                     timer::Timings) where {N, Char, Shift}
+                     timer::Timings,
+                     r::Registry) where {N, Char, Shift}
 
     # compute ideal
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
@@ -294,7 +296,7 @@ function sig_decomp!(basis::Basis{N},
                                                              tr, ps,
                                                              zd_ind, tgs,
                                                              ind_ord,
-                                                             lc_set)
+                                                             lc_set, r)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr))
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
@@ -412,7 +414,8 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
-                lc_set::LocClosedSet) where N
+                lc_set::LocClosedSet,
+                r::Registry) where N
 
 
     @inbounds begin
@@ -449,7 +452,7 @@ function split!(basis::Basis{N},
                                           tags, new_tg = :split)
 
         # new components
-        lc_set_hull, lc_set_nz = split(lc_set, h)
+        lc_set_hull, lc_set_nz = split(lc_set, h, r)
         lc_set_nz.seq = lc_set.seq[sorted_inds]
         push!(lc_set_hull.seq, h)
 

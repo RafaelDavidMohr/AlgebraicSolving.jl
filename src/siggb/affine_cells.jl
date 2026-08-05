@@ -3,7 +3,7 @@ function loc_closed_set(seq::Vector{T}) where {T<:MPolyRingElem}
     R = parent(first(seq))
     codim_upper_bound = min(length(seq), ngens(R) - 1)
     gb = saturate(seq, last(gens(R)))
-    return LocClosedSet(seq, codim_upper_bound, [gb])
+    return LocClosedSet(seq, codim_upper_bound, [gb], [Int[]])
 end
 
 # basic data
@@ -47,62 +47,74 @@ function add_to_output!(res::Vector{C},
     return false
 end
 
-function add_inequation!(X::LocClosedSet, h::P;
+function add_inequation!(X::LocClosedSet, h::P, r::Registry;
                          known_zds=P[]::Vector{P}) where P
-    R = ring(X)
+    
+    ri = update!(r, h)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
+        ri != 0 && push!(X.ineqns[i], ri)
     end
 end
 
-function add_inequation(X::LocClosedSet, h::MPolyRingElem)
+function add_inequation(X::LocClosedSet, h::MPolyRingElem, r::Registry)
     Y = deepcopy(X)
     if isone(h)
         return Y
     end
-    add_inequation!(Y, h)
+    add_inequation!(Y, h, r)
     return Y
 end
 
 # which equations are hull equations needs to be managed outside of this function
-function split(X::LocClosedSet, g::MPolyRingElem)
-    tim = @elapsed X_min_g = add_inequation(X, g)
+function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
+    tim = @elapsed X_min_g = add_inequation(X, g, r)
     @info "initial saturation time $(tim)"
 
     X_hull_g = deepcopy(X)
 
     col_gbs = X_min_g.gbs
     hull_gbs = Vector{typeof(g)}[]
+    ineqns = Vector{Int}[]
     R = ring(X)
-    for (X_gb, col_gb) in zip(X.gbs, col_gbs)
+    for (X_gb, X_gb_ineqns, col_gb) in zip(X.gbs, X.ineqns, col_gbs)
         if one(R) in col_gb
             @info "equation vanishes on one GB"
             tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), last(gens(R)))
             @info "adding equation time $(tim)"
             push!(hull_gbs, new_gb)
+            push!(ineqns, X_gb_ineqns)
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb), X_gb))
         isempty(H_rand) && continue
-        gbs = (el -> el[2]).(remove(X_gb, H_rand, known_eqns = [g]))
-        for gb in gbs
+        gbsineqns = remove!(X_gb, H_rand, r, known_eqns = [g])
+        for (gb, gb_ineqns) in gbsineqns
             push!(hull_gbs, gb)
+            push!(ineqns, vcat(X_gb_ineqns, gb_ineqns))
         end
     end
     X_hull_g.gbs = hull_gbs
+    X_hull_g.ineqns = ineqns
 
-    filter!(gb -> !(one(R) in gb), X_min_g.gbs)
-    filter!(gb -> !(one(R) in gb), X_hull_g.gbs)
+    todel = findall(gb -> one(R) in gb, X_min_g.gbs)
+    deleteat!(X_min_g.gbs, todel)
+    !isempty(X_min_g.ineqns) && deleteat!(X_min_g.ineqns, todel)
+
+    todel = findall(gb -> one(R) in gb, X_hull_g.gbs)
+    deleteat!(X_hull_g.gbs, todel)
+    !isempty(X_hull_g.ineqns) && deleteat!(X_hull_g.ineqns, todel)
 
     return X_hull_g, X_min_g
 end
 
-function remove(gb::Vector{P},
-                H::Vector{P};
-                known_eqns::Vector{P}=P[]) where P
+function remove!(gb::Vector{P},
+                 H::Vector{P},
+                 r::Registry;
+                 known_eqns::Vector{P}=P[]) where P
 
-    res = Tuple{P, Vector{P}}[]
+    res = Tuple{Vector{P}, Vector{Int}}[]
     isempty(H) && return res
 
     R = parent(first(gb))
@@ -111,9 +123,10 @@ function remove(gb::Vector{P},
     @info "remove time $(tim) for degree $(total_degree(h))"
     if one(R) in gb1
         @info "is empty"
-        return remove(gb, H[2:end], known_eqns=known_eqns)
+        return remove!(gb, H[2:end], r, known_eqns=known_eqns)
     end
-    push!(res, (h, gb1))
+    ri = update!(r, h)
+    iszero(ri) ? push!(res, (gb1, Int[])) : push!(res, (gb1, [ri]))
     tim1 = @elapsed G = filter(!iszero,
                                normal_form(random_lin_combs(gb1), gb))
     if isempty(G)
@@ -123,10 +136,10 @@ function remove(gb::Vector{P},
     rem_rest = H[2:end]
     tim2 = @elapsed filter!(h -> !iszero(normal_form(h*g_rand, gb)), rem_rest)
     @info "normal forms computed in $(tim1 + tim2)"
-    gbs2 = remove(gb, rem_rest, known_eqns = known_eqns)
-    for gb2 in gbs2
-        gbs3 = remove(gb2, G, known_eqns = vcat(known_eqns, [h]))
-        append!(res, gbs3)
+    gbsineqns2 = remove!(gb, rem_rest, r, known_eqns = known_eqns)
+    for (gb2, ineqns2) in gbsineqns2
+        gbs3ineqns = remove!(gb2, G, r, known_eqns = vcat(known_eqns, [h]))
+        append!(res, [(gb3, vcat(ineqns2, ineqns3)) for (gb3, ineqns3) in gbs3ineqns])
     end
     return res
 end
