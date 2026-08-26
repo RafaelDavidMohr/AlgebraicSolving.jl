@@ -266,7 +266,7 @@ mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
 end
 
 # for user level output of equidimensional decomposition
-struct LocallyClosedSet{T <: MPolyRingElem}
+mutable struct LocallyClosedSet{T <: MPolyRingElem}
     eqns::Vector{T}
     ineqns::Vector{T}
     gb::Vector{T}
