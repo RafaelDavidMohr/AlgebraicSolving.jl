@@ -59,7 +59,7 @@ function equidimensional_decomposition(I::Ideal{T};
     cnt = 1
     while !is_finished(r)
         p = Int32(rand_bits_prime(ZZ, 31))
-        println("round $cnt with $p")
+        info_level == 1 && @info "round $cnt with prime $p"
         new_prime!(r, p)
         S, _ = polynomial_ring(GF(p), ["x$i" for i in 1:ngens(Rhom)],
                                internal_ordering = :degrevlex)
@@ -73,6 +73,7 @@ function equidimensional_decomposition(I::Ideal{T};
     for cell in cells
         append!(res, get_output_cells(cell, R, Fhom, r))
     end
+    info_level == 1 && @info "needed $cnt primes"
     return res
 end
 

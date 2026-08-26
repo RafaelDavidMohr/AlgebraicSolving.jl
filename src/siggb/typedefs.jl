@@ -247,7 +247,7 @@ end
 mutable struct ReconstructPol
     exps::Vector{Vector{Exp}}
     coeff_cands::Vector{QQFieldElem}
-    mod_coeffs::Vector{Int}
+    mod_coeffs::Vector{ZZRingElem}
     is_stable::Bool
 end
 
@@ -257,8 +257,8 @@ mutable struct ReconstructRegistry <: Registry
     R::QQMPolyRing
     pols::Vector{ReconstructPol}
     curr_ind::Int
-    primes::Vector{Int32}
-    current_prime::Int32
+    primes::Vector{ZZRingElem}
+    current_prime::ZZRingElem
 end
 
 mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
