@@ -7,10 +7,10 @@ Given a polynomial ideal `I`, return a list of locally closed sets
 dimension) and s.t. the algebraic set defined by `I` equals the union of
 the locally closed sets in `dec`.
 
-**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
+When the ground field of `I` is the rational numbers, a multi-modular method is used.
 
 # Arguments
-- `I::Ideal{T} where T <: MpolyElem`: input ideal.
+- `I::Ideal{T} where T <: MPolyRingElem`: input ideal.
 - `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
 
 # Example
@@ -31,7 +31,12 @@ julia> equidimensional_decomposition(I)
 ```
 """
 function equidimensional_decomposition(I::Ideal{T};
-                                       info_level::Int=0) where {T <: FqMPolyRingElem}
+                                       info_level::Int=0) where {T <: MPolyRingElem}
+    return _equidimensional_decomposition(I, info_level = info_level)
+end
+
+function _equidimensional_decomposition(I::Ideal{T};
+                                        info_level::Int=0) where {T <: FqMPolyRingElem}
 
     F = I.gens
     Fhom = homogenize(F)
@@ -46,8 +51,8 @@ function equidimensional_decomposition(I::Ideal{T};
     return res
 end
 
-function equidimensional_decomposition(I::Ideal{T};
-                                       info_level::Int=0) where {T <: QQMPolyRingElem}
+function _equidimensional_decomposition(I::Ideal{T};
+                                        info_level::Int=0) where {T <: QQMPolyRingElem}
 
     F = I.gens
     Fhom = homogenize(F)
