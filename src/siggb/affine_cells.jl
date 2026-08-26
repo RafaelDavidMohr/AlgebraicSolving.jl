@@ -221,9 +221,10 @@ function get_output_cells(cell::LocClosedSet,
                           input_eqns::Vector{QQMPolyRingElem},
                           r::ReconstructRegistry)
 
-    res = LocallyClosedSet{FqMPolyRingElem}[]
+    res = LocallyClosedSet{QQMPolyRingElem}[]
     S = ring(cell)
     eqns = filter(f -> reduce_mod_p(f, S) in cell.seq, input_eqns)
+    eqns = _dehomogenize(eqns, R)
     for ineqninds in cell.ineqns
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         push!(res, LocallyClosedSet(eqns, ineqns, QQMPolyRingElem[]))

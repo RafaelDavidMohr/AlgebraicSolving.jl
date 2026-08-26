@@ -9,8 +9,6 @@ function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRing)
     return finish(ctx)
 end
 
-lift_to_int(a::FqFieldElem) = Int(lift(ZZ, a))
-
 function is_finished(r::ReconstructRegistry)
     !isempty(r.pols) && all(p -> p.is_stable, r.pols)
 end
@@ -19,7 +17,7 @@ function get_pol(r::ReconstructRegistry, i::Int)
     rp = r.pols[i]
     ctx = MPolyBuildCtx(r.R)
     for (cf, exp) in zip(rp.coeff_cands, rp.exps)
-        push_term!(ctx, cf, exp)
+        push_term!(ctx, cf, Int64.(exp))
     end
     return finish(ctx)
 end
@@ -47,7 +45,7 @@ end
 function ReconstructPol(p::FqMPolyRingElem)
     p *= leading_coefficient(p)^(-1)
     exps = collect(exponent_vectors(p))
-    mod_coeffs = lift_to_int.(collect(coefficients(p)))
+    mod_coeffs = (c -> lift(ZZ, c)).(collect(coefficients(p)))
     coeff_cands = (c -> QQ(c)).(mod_coeffs)
     return ReconstructPol(exps, coeff_cands, mod_coeffs, false)
 end
@@ -57,7 +55,6 @@ function update_registry!(reg::ReconstructRegistry,
                           new_pol::FqMPolyRingElem)
 
     ri = reg.curr_ind
-    println("polynomial $(new_pol) at index $ri")
     
     if length(reg.pols) < ri
         push!(reg.pols, ReconstructPol(new_pol))
@@ -79,7 +76,7 @@ function update_registry!(reg::ReconstructRegistry,
     all_is_stable = true
     i = 1
     for (ccurr, cnew_fq) in zip(pr.coeff_cands, coefficients(new_pol))
-        cnew = lift_to_int(cnew_fq)
+        cnew = lift(ZZ, cnew_fq)
         ccurr_new = crt(ZZ(ccurr), ZZ(pprod), ZZ(cnew), ZZ(curr_p))
         pr.mod_coeffs[i] = ccurr_new
 
@@ -93,7 +90,6 @@ function update_registry!(reg::ReconstructRegistry,
 
         i += 1
     end
-    println("$(pr.coeff_cands)")
     pr.is_stable = all_is_stable
     reg.curr_ind += 1
     return ri
