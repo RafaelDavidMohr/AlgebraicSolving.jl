@@ -40,14 +40,16 @@ function curve_rational_parametrization(
         info_level::Int=0,                                                                  # info level for print outs
         cfs_lfs::Union{Vector{<:Vector{<:Union{Int,ZZRingElem}}}, Nothing} = nothing,  # coeffs of linear forms
         nr_thrds::Int=1,                                                                    # number of threads (msolve)
+        check_cfs::Bool = true
     )
     @assert nvars(parent(I)) >= 2 "I must be defined in a ring with at least 2 variables"
     if !isnothing(cfs_lfs)
+        @assert length(cfs_lfs) >= 2 "When specified, at least two linear forms must be provided"
         cfs_lfs = Vector{ZZRingElem}[[ ZZRingElem(c) for c in cfs_lf] for cfs_lf in cfs_lfs] # Convert Int64 into ZZRingElem
     end
 
     info_level > 0 && println("Compute generic linear forms...")
-    Inew, cfs_lfs = _add_genvars(I, 2, cfs_lfs)
+    Inew, cfs_lfs = _add_genvars(I, isnothing(cfs_lfs) ? 2 : length(cfs_lfs), cfs_lfs, check_cfs = check_cfs)
 
     if Inew.dim == -1
         T = polynomial_ring(QQ, [:x, :y])[1]
@@ -151,7 +153,8 @@ function _add_genvars(
     I::Ideal{<:MPolyRingElem},
     n_gen::Int,
     cfs_lfs::Union{Vector{<:Vector{<:RingElem}}, Nothing},
-    genS::Vector{Symbol} = Symbol[]
+    genS::Vector{Symbol} = Symbol[];
+    check_cfs::Bool = true
 )
     F = I.gens
     R = parent(I)
@@ -186,7 +189,7 @@ function _add_genvars(
         end
     end
 
-    if characteristic(K) == 0
+    if characteristic(K) == 0 && check_cfs
         (DEG, DIM), cfs_lfs = _find_generic_linear_forms(I_ext, n_gen, cfs_lfs)
     else
         DEG, DIM = hilbert_degree(I_ext), dimension(I_ext)

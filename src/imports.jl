@@ -54,6 +54,7 @@ import Nemo:
     QQMPolyRingElem,
     rising_factorial,
     root,
+    to_univariate,
     unit,
     vars,
     ZZ,

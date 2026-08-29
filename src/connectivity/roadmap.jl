@@ -104,7 +104,7 @@ function _roadmap_rec(
 
     # If we reach a new depth level, then generate new linear forms
     if length(L_chosen) < e + 2
-        append_generic_linear_forms!(L_chosen, I, base_pt)
+        append_generic_linear_forms!(L_chosen, I, base_pt, info_level)
     end
     L_e1 = L_chosen[1 : e+1]
     L_e2 = L_chosen[1 : e+2]
@@ -218,7 +218,8 @@ so that all genericity conditions pass for the current fiber.
 function append_generic_linear_forms!(
     L_chosen::Vector{P},
     I::Ideal{P},
-    base_pt::BasePoint{P}
+    base_pt::BasePoint{P},
+    info_level = 0
 ) where {P <: QQMPolyRingElem}
 
     R = parent(I.gens[1])
@@ -245,6 +246,7 @@ function append_generic_linear_forms!(
                 L_next1 = sum(cache[i][j] * v[j] for j in 1:n)
                 L_test = [L_next1, L_next2]
 
+                info_level > 0 && println("Try linear forms ", L_test)
                 if check_genericity(I, base_pt, L_test)
                     push!(L_chosen, L_next1, L_next2)
                     return
@@ -263,6 +265,7 @@ function append_generic_linear_forms!(
 
             L_test = vcat(L_chosen, L_next)
 
+            info_level > 0 && println("Try linear form ", L_next)
             if check_genericity(I, base_pt, L_test)
                 push!(L_chosen, L_next)
                 return

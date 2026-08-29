@@ -8,5 +8,6 @@ export polynomial_ring, MPolyRing, GFElem, MPolyRingElem,
        equidimensional_decomposition, homogenize, dimension, FqMPolyRingElem,
        hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial,
        curve_rational_parametrization, roadmap, computepolar, all_eqs,
-       all_base_pts, nb_nodes
-
+       all_base_pts, nb_nodes, connected_components, number_of_connected_components,
+       group_by_component, merge_graphs, build_graph_data,curve_graph,
+       curve_arrangement_graph

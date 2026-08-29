@@ -72,8 +72,9 @@ function computepolar(
     Jphi = [ j for j in J if j <= nphi ]
     Jproj = setdiff(J, Jphi)
 
+    VgenNzero = [ fv for fv in V.gens if !iszero(fv) ]
     # Construct the truncated Jacobian matrix
-    psi = vcat(V.gens, phi[Jphi])
+    psi = vcat(VgenNzero, phi[Jphi])
     JW = matrix(R, P[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
     # Compute the minors
     sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
@@ -82,7 +83,7 @@ function computepolar(
     if only_mins
         return minors
     else
-        return vcat(V.gens, minors)
+        return vcat(VgenNzero, minors)
     end
 end
 
