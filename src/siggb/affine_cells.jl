@@ -196,7 +196,7 @@ Zariski closure of `X`.
 computation. The output of this function is cached.
 """
 function Ideal(X::LocallyClosedSet)
-    isdefined(X, :ideal) && return X.ideal
+    !ismissing(X.ideal) && return X.ideal
     gb = saturate(X.eqns, X.ineqns)
     I = Ideal(gb)
     I.gb[0] = gb
