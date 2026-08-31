@@ -1,34 +1,4 @@
 @doc Markdown.doc"""
-    equations(X::LocallyClosedSet)
-
-Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot \dots \cdot g_r)$,
-return the list of polynomials $F$.
-"""
-equations(X::LocallyClosedSet) = X.eqns
-
-@doc Markdown.doc"""
-    inequations(X::LocallyClosedSet)
-
-Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot
-\dots \cdot g_r)$, return the list of polynomials $g_1, \dots g_r$.
-"""
-inequations(X::LocallyClosedSet) = X.ineqns
-
-@doc Markdown.doc"""
-    groebner_basis(X::LocallyClosedSet)
-
-Return a Gröbner basis for an ideal whose zeros coincide with the
-Zariski closure of `X`. If no Gröbner basis is present, one is computed
-from scratch.
-"""
-function groebner_basis(X::LocallyClosedSet)
-    !isempty(X.gb) && return X.gb
-    gb = saturate(X.eqns, X.ineqns)
-    X.gb = gb
-    return gb
-end
-
-@doc Markdown.doc"""
     equidimensional_decomposition(I::Ideal{T}, info_level::Int=0) where {T <: MPolyRingElem}
 
 Given a polynomial ideal `I`, return a list of locally closed sets
@@ -61,20 +31,48 @@ julia> equidimensional_decomposition(I)
 ```
 """
 function equidimensional_decomposition(I::Ideal{T};
-                                       info_level::Int=0) where {T <: MPolyRingElem}
+                                       info_level::Int=0) where {T <: FqMPolyRingElem}
 
     F = I.gens
     Fhom = homogenize(F)
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
+    cells = _sig_decomp(Fhom, r, info_level = info_level)
+    res = LocallyClosedSet{T}[]
+    R = parent(I)
+    for cell in cells
+        append!(res, get_output_cells(cell, R, r))
+    end
+    return res
+end
+
+function equidimensional_decomposition(I::Ideal{T};
+                                       info_level::Int=0) where {T <: QQMPolyRingElem}
+
+    F = I.gens
+    Fhom = homogenize(F)
+    sort!(Fhom, by = p -> total_degree(p))
+    Rhom = parent(first(Fhom))
+    r = ReconstructRegistry(Rhom, ReconstructPol[], 1,
+                            Int32[], Int32(0))
     cells = LocClosedSet{FqMPolyRingElem}[]
+    cnt = 1
     while !is_finished(r)
-        cells = _sig_decomp(Fhom, r, info_level = info_level)
+        p = Int32(rand_bits_prime(ZZ, 31))
+        println("round $cnt with $p")
+        new_prime!(r, p)
+        S, _ = polynomial_ring(GF(p), ["x$i" for i in 1:ngens(Rhom)],
+                               internal_ordering = :degrevlex)
+        Fhomp = [reduce_mod_p(f, S) for f in Fhom]
+        cells = _sig_decomp(Fhomp, r, info_level = info_level)
+        cnt += 1
+        cnt >= 10 && break
     end
     res = LocallyClosedSet{T}[]
     R = parent(I)
     for cell in cells
-        append!(res, get_output_cells(cell, R, F, r))
+        append!(res, get_output_cells(cell, R, Fhom, r))
     end
     return res
 end
+

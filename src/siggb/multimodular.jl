@@ -1,4 +1,4 @@
-function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRingElem)
+function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRing)
 
     F = base_ring(R)
     ctx = MPolyBuildCtx(R)
@@ -28,12 +28,14 @@ function get_pols(r::ReconstructRegistry, inds::Vector{Int})
     return [get_pol(r, i) for i in inds]
 end
 
-function is_finished(r::ModularRegistry)
-    !isempty(r.pols)
-end
-
 function get_pols(r::ModularRegistry, inds::Vector{Int})
     return r.pols[inds]
+end
+
+function new_prime!(r::ReconstructRegistry, p::Integer)
+    !iszero(r.current_prime) && push!(r.primes, r.current_prime)
+    r.current_prime = p
+    r.curr_ind = 1
 end
 
 # TODO:adjust
@@ -47,14 +49,15 @@ function ReconstructPol(p::FqMPolyRingElem)
     exps = collect(exponent_vectors(p))
     mod_coeffs = lift_to_int.(collect(coefficients(p)))
     coeff_cands = (c -> QQ(c)).(mod_coeffs)
-    return ReconstructPol(exps, mod_coeffs, coeff_cands, false)
+    return ReconstructPol(exps, coeff_cands, mod_coeffs, false)
 end
 
 # update polynomial at currend index of registry
-function update!(reg::ReconstructRegistry,
-                 new_pol::FqMPolyRingElem)
+function update_registry!(reg::ReconstructRegistry,
+                          new_pol::FqMPolyRingElem)
 
     ri = reg.curr_ind
+    println("polynomial $(new_pol) at index $ri")
     
     if length(reg.pols) < ri
         push!(reg.pols, ReconstructPol(new_pol))
@@ -69,6 +72,7 @@ function update!(reg::ReconstructRegistry,
         reg.curr_ind += 1
         return ri
     end
+
 
     pprod = prod(reg.primes)
     curr_p = reg.current_prime
@@ -89,12 +93,13 @@ function update!(reg::ReconstructRegistry,
 
         i += 1
     end
+    println("$(pr.coeff_cands)")
     pr.is_stable = all_is_stable
     reg.curr_ind += 1
     return ri
 end
 
-function update!(reg::ModularRegistry{T}, p::T) where T
+function update_registry!(reg::ModularRegistry{T}, p::T) where T
     push!(reg.pols, p)
     return length(reg.pols)
 end
