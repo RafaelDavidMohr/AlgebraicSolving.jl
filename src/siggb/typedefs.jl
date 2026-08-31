@@ -269,5 +269,9 @@ end
 mutable struct LocallyClosedSet{T <: MPolyRingElem}
     eqns::Vector{T}
     ineqns::Vector{T}
-    gb::Vector{T}
+    ideal::Ideal{T}
+
+    function LocallyClosedSet{T}(eqns::Vector{T}, ineqns::Vector{T}) where {T <: MPolyRingElem}
+        return new(eqns, ineqns)
+    end
 end
