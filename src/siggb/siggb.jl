@@ -237,7 +237,7 @@ function _sig_decomp(sys::Vector{T}, r::Registry; info_level::Int=0) where {T <:
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
-    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    logger = ConsoleLogger(stdout, info_level != 1 ? Warn : Info)
     result = with_logger(logger) do
         R = parent(first(sys))
         timer = new_timer()

@@ -11,7 +11,7 @@ When the ground field of `I` is the rational numbers, a multi-modular method is 
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input ideal.
-- `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
+- `info_level::Int=0`: info level printout: off (`0`, default), details about multi-modular computation (`1`), computational details (`2`)
 
 # Example
 ```jldoctest
@@ -42,7 +42,7 @@ function _equidimensional_decomposition(I::Ideal{T};
     Fhom = homogenize(F)
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
-    cells = _sig_decomp(Fhom, r, info_level = info_level)
+    cells = _sig_decomp(Fhom, r, info_level = info_level - 1)
     res = LocallyClosedSet{T}[]
     R = parent(I)
     for cell in cells
@@ -61,24 +61,28 @@ function _equidimensional_decomposition(I::Ideal{T};
     r = ReconstructRegistry(Rhom, ReconstructPol[], 1,
                             Int32[], Int32(0))
     cells = LocClosedSet{FqMPolyRingElem}[]
-    cnt = 1
+    cnt = 0
     while !is_finished(r)
+        cnt += 1
         p = Int32(rand_bits_prime(ZZ, 31))
-        info_level == 1 && @info "round $cnt with prime $p"
+            
         new_prime!(r, p)
         S, _ = polynomial_ring(GF(p), ["x$i" for i in 1:ngens(Rhom)],
                                internal_ordering = :degrevlex)
         Fhomp = [reduce_mod_p(f, S) for f in Fhom]
-        cells = _sig_decomp(Fhomp, r, info_level = info_level)
-        cnt += 1
-        cnt >= 10 && break
+        cells = _sig_decomp(Fhomp, r, info_level = info_level - 1)
+        if info_level >= 1
+            npols = length(r.pols)
+            nstable = length(findall(p -> p.is_stable, r.pols))
+            @info "decomposition $cnt with prime $p, $nstable / $npols finished"
+        end
     end
     res = LocallyClosedSet{T}[]
     R = parent(I)
     for cell in cells
         append!(res, get_output_cells(cell, R, Fhom, r))
     end
-    info_level == 1 && @info "needed $cnt primes"
+    info_level >= 1 && @info "needed $cnt primes"
     return res
 end
 
