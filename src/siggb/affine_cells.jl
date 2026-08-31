@@ -187,17 +187,20 @@ Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot
 inequations(X::LocallyClosedSet) = X.ineqns
 
 @doc Markdown.doc"""
-    groebner_basis(X::LocallyClosedSet)
+    Ideal(X::LocallyClosedSet)
 
-Return a Gröbner basis for an ideal whose zeros coincide with the
-Zariski closure of `X`. If no Gröbner basis is present, one is computed
-from scratch.
+Return a polynomial ideal `I` whose zero locus coincides with the
+Zariski closure of `X`.
+
+**Note**: If no ideal `I` is known, this will require a Gröbner basis
+computation. The output of this function is cached.
 """
-function groebner_basis(X::LocallyClosedSet)
-    !isempty(X.gb) && return X.gb
+function Ideal(X::LocallyClosedSet)
+    isdefined(X, :ideal) && return X.ideal
     gb = saturate(X.eqns, X.ineqns)
-    X.gb = gb
-    return gb
+    I = Ideal(gb)
+    I.gb[0] = gb
+    return I
 end
 
 # convert internal cells to user level output cells
@@ -210,7 +213,11 @@ function get_output_cells(cell::LocClosedSet,
     for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         gb_dehom = _dehomogenize(gb, R)
-        push!(res, LocallyClosedSet(eqns, ineqns, gb_dehom))
+        ls = LocallyClosedSet(eqns, ineqns)
+        I = Ideal(gb_dehom)
+        I.gb[0] = gb_dehom
+        ls.ideal = I
+        push!(res, ls)
     end
     return res
 end
@@ -227,7 +234,7 @@ function get_output_cells(cell::LocClosedSet,
     eqns = _dehomogenize(eqns, R)
     for ineqninds in cell.ineqns
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
-        push!(res, LocallyClosedSet(eqns, ineqns, QQMPolyRingElem[]))
+        push!(res, LocallyClosedSet(eqns, ineqns))
     end
     return res
 end
