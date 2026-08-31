@@ -43,7 +43,9 @@ function _equidimensional_decomposition(I::Ideal{T};
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
     logger = ConsoleLogger(stdout, info_level != 2 ? Warn : Info)
-    cells = _sig_decomp(Fhom, r)
+    cells = with_logger(logger) do
+        _sig_decomp(Fhom, r)
+    end
     res = LocallyClosedSet{T}[]
     R = parent(I)
     for cell in cells
