@@ -220,7 +220,7 @@ end
 
 #---------------- functions for splitting --------------------#
 
-function _sig_decomp(sys::Vector{T}, r::Registry; info_level::Int=0) where {T <: MPolyRingElem}
+function _sig_decomp(sys::Vector{T}, r::Registry) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
@@ -237,15 +237,12 @@ function _sig_decomp(sys::Vector{T}, r::Registry; info_level::Int=0) where {T <:
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
-    logger = ConsoleLogger(stdout, info_level != 1 ? Warn : Info)
-    result = with_logger(logger) do
-        R = parent(first(sys))
-        timer = new_timer()
-        lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
-                              tags, ind_order, tr, R, timer, r)
-        @info timer
-        return lc_sets
-    end
+    R = parent(first(sys))
+    timer = new_timer()
+    lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
+                          tags, ind_order, tr, R, timer, r)
+    @info timer
+    return lc_sets
 end
 
 
