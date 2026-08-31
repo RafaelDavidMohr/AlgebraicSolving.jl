@@ -51,7 +51,7 @@ function add_inequation!(X::LocClosedSet, h::P, r::Registry;
                          known_zds=P[]::Vector{P}) where P
     
     h *= leading_coefficient(h)^(-1)
-    ri = update!(r, h)
+    ri = update_registry!(r, h)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
         push!(X.ineqns[i], ri)
@@ -88,7 +88,7 @@ function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
-        H_rand = filter(!iszero, normal_form(r <: ModularRegistry ? random_lin_combs(col_gb) : col_gb, X_gb))
+        H_rand = filter(!iszero, normal_form(isa(r, ModularRegistry) ? random_lin_combs(col_gb) : col_gb, X_gb))
         isempty(H_rand) && continue
         gbsineqns = remove!(X_gb, H_rand, r, known_eqns = [g])
         for (gb, gb_ineqns) in gbsineqns
@@ -127,10 +127,10 @@ function remove!(gb::Vector{P},
         return remove!(gb, H[2:end], r, known_eqns=known_eqns)
     end
     h *= leading_coefficient(h)^(-1)
-    ri = update!(r, h)
+    ri = update_registry!(r, h)
     push!(res, (gb1, [ri]))
     tim1 = @elapsed G = filter(!iszero,
-                               normal_form(r <: ModularRegistry ? random_lin_combs(gb1) : gb1, gb))
+                               normal_form(isa(r, ModularRegistry) ? random_lin_combs(gb1) : gb1, gb))
     if isempty(G)
         return res
     end
@@ -170,10 +170,39 @@ function Base.show(io::IO, ::MIME"text/plain", X::LocallyClosedSet)
     print(io, str)
 end
 
+@doc Markdown.doc"""
+    equations(X::LocallyClosedSet)
+
+Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot \dots \cdot g_r)$,
+return the list of polynomials $F$.
+"""
+equations(X::LocallyClosedSet) = X.eqns
+
+@doc Markdown.doc"""
+    inequations(X::LocallyClosedSet)
+
+Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot
+\dots \cdot g_r)$, return the list of polynomials $g_1, \dots g_r$.
+"""
+inequations(X::LocallyClosedSet) = X.ineqns
+
+@doc Markdown.doc"""
+    groebner_basis(X::LocallyClosedSet)
+
+Return a Gröbner basis for an ideal whose zeros coincide with the
+Zariski closure of `X`. If no Gröbner basis is present, one is computed
+from scratch.
+"""
+function groebner_basis(X::LocallyClosedSet)
+    !isempty(X.gb) && return X.gb
+    gb = saturate(X.eqns, X.ineqns)
+    X.gb = gb
+    return gb
+end
+
 # convert internal cells to user level output cells
 function get_output_cells(cell::LocClosedSet,
                           R::FqMPolyRing,
-                          input_eqns::Vector{FqMPolyRingElem},
                           r::ModularRegistry)
 
     res = LocallyClosedSet{FqMPolyRingElem}[]
