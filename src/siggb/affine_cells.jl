@@ -243,6 +243,7 @@ function get_output_cells(cell::LocClosedSet,
     end
     eqns = _dehomogenize(eqns, R)
     for ineqninds in cell.ineqns
+        isempty(ineqninds) && continue
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         push!(res, LocallyClosedSet(eqns, ineqns))
     end
