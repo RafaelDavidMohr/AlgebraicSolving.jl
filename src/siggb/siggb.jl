@@ -448,9 +448,9 @@ function split!(basis::Basis{N},
                                           tags, new_tg = :split)
 
         # new components
-        lc_set_hull, lc_set_nz = split(lc_set, h, r)
+        lc_set_hull, lc_set_nz, registry_index = split(lc_set, h, r)
         lc_set_nz.seq = lc_set.seq[sorted_inds]
-        push!(lc_set_hull.seq, h)
+        push!(lc_set_hull.seq, (h, registry_index))
 
         new_codim_ub = min(lc_set.codim_upper_bound, num_eqns(lc_set) - 1)
         lc_set_nz.codim_upper_bound = new_codim_ub

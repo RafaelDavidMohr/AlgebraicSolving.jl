@@ -1,3 +1,5 @@
+using Logging
+
 @doc Markdown.doc"""
     equidimensional_decomposition(I::Ideal{T}, info_level::Int=0) where {T <: MPolyRingElem}
 
@@ -32,17 +34,26 @@ julia> equidimensional_decomposition(I)
 """
 function equidimensional_decomposition(I::Ideal{T};
                                        info_level::Int=0) where {T <: MPolyRingElem}
-    return _equidimensional_decomposition(I, info_level = info_level)
+
+    log_level = if info_level == 0
+        Warn
+    elseif info_level == 1
+        INFOONE
+    else
+        Info
+    end
+        
+    logger = ConsoleLogger(stdout, log_level)
+    return _equidimensional_decomposition(I, logger)
 end
 
-function _equidimensional_decomposition(I::Ideal{T};
-                                        info_level::Int=0) where {T <: FqMPolyRingElem}
+function _equidimensional_decomposition(I::Ideal{T},
+                                        logger::ConsoleLogger) where {T <: FqMPolyRingElem}
 
     F = I.gens
     Fhom = homogenize(F)
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
-    logger = ConsoleLogger(stdout, info_level != 2 ? Warn : Info)
     cells = with_logger(logger) do
         _sig_decomp(Fhom, r)
     end
@@ -54,8 +65,8 @@ function _equidimensional_decomposition(I::Ideal{T};
     return res
 end
 
-function _equidimensional_decomposition(I::Ideal{T};
-                                        info_level::Int=0) where {T <: QQMPolyRingElem}
+function _equidimensional_decomposition(I::Ideal{T},
+                                        logger::ConsoleLogger) where {T <: QQMPolyRingElem}
 
     F = I.gens
     Fhom = homogenize(F)
@@ -65,7 +76,6 @@ function _equidimensional_decomposition(I::Ideal{T};
                             Int32[], Int32(0))
     cells = LocClosedSet{FqMPolyRingElem}[]
     cnt = 0
-    logger = ConsoleLogger(stdout, info_level != 2 ? Warn : Info)
     with_logger(logger) do
         while !is_finished(r)
             cnt += 1
@@ -76,18 +86,14 @@ function _equidimensional_decomposition(I::Ideal{T};
                                    internal_ordering = :degrevlex)
             Fhomp = [reduce_mod_p(f, S) for f in Fhom]
             cells = _sig_decomp(Fhomp, r)
-            if info_level >= 1
-                npols = length(r.pols)
-                nstable = length(findall(p -> p.is_stable, r.pols))
-                println("decomposition $cnt with prime $p, $nstable / $npols finished")
-            end
+            @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> p.is_stable, r.pols))) / $(length(r.pols)) finished"
         end
         res = LocallyClosedSet{T}[]
         R = parent(I)
         for cell in cells
             append!(res, get_output_cells(cell, R, Fhom, r))
         end
-        info_level >= 1 && println("needed $cnt primes")
+        @logmsg INFOONE "needed $cnt primes"
         return res
     end
 end
