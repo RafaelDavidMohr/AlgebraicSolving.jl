@@ -75,12 +75,17 @@ function update_registry!(reg::ReconstructRegistry,
     curr_p = reg.current_prime
     all_is_stable = true
     i = 1
-    for (ccurr, cnew_fq) in zip(pr.coeff_cands, coefficients(new_pol))
+    for (ccurr, cnew_fq) in zip(pr.mod_coeffs, coefficients(new_pol))
         cnew = lift(ZZ, cnew_fq)
         ccurr_new = crt(ZZ(ccurr), ZZ(pprod), ZZ(cnew), ZZ(curr_p))
         pr.mod_coeffs[i] = ccurr_new
 
-        new_qq_coeff = reconstruct(ccurr_new, pprod * curr_p)
+        new_qq_coeff = try
+            reconstruct(ccurr_new, pprod * curr_p)
+        catch
+            all_is_stable = false
+            pr.coeff_cands[i]
+        end
         if new_qq_coeff == pr.coeff_cands[i]
             i += 1
             continue

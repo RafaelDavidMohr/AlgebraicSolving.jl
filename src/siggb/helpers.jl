@@ -404,7 +404,8 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
             enew = push!(e, d - sum(e))
             push_term!(ctx, c, e)
         end
-        push!(res, finish(ctx))
+        p = finish(ctx)
+        push!(res, leading_coefficient(p)^(-1) * p)
     end
     return res
 end
