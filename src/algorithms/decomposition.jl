@@ -87,6 +87,7 @@ function _equidimensional_decomposition(I::Ideal{T},
             Fhomp = [reduce_mod_p(f, S) for f in Fhom]
             cells = _sig_decomp(Fhomp, r)
             @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> p.is_stable, r.pols))) / $(length(r.pols)) finished"
+            isempty(r.pols) && break # catch the case where no splitting happens
         end
         res = LocallyClosedSet{T}[]
         R = parent(I)
