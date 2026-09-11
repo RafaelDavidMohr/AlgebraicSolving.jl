@@ -276,4 +276,8 @@ mutable struct LocallyClosedSet{T <: MPolyRingElem}
     function LocallyClosedSet(eqns::Vector{T}, ineqns::Vector{T}) where {T <: MPolyRingElem}
         return new{T}(eqns, ineqns, missing)
     end
+
+    function LocallyClosedSet(eqns::Vector{T}) where {T <: MPolyRingElem}
+        return new{T}(eqns, T[], missing)
+    end
 end

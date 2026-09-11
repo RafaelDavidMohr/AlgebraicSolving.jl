@@ -157,16 +157,17 @@ function Base.show(io::IO, ::MIME"text/plain", X::LocallyClosedSet)
     for (i, eqn) in enumerate(X.eqns)
         str *= i == length(X.eqns) ? "$(eqn))" : "$(eqn), "
     end
-    isempty(X.ineqns) && print(io, str)
 
-    str *= " \\ V("
-    for (i, ineqn) in enumerate(X.ineqns)
-        ineqn_repr = if isone(length(ineqn)) || isone(length(X.ineqns))
-            "$(ineqn)"
-        else
-            "($(ineqn))"
+    if !isempty(X.ineqns)
+        str *= " \\ V("
+        for (i, ineqn) in enumerate(X.ineqns)
+            ineqn_repr = if isone(length(ineqn)) || isone(length(X.ineqns))
+                "$(ineqn)"
+            else
+                "($(ineqn))"
+            end
+            str *= i == length(X.ineqns) ? "$(ineqn_repr))" : "$(ineqn_repr) * "
         end
-        str *= i == length(X.ineqns) ? "$(ineqn_repr))" : "$(ineqn_repr) * "
     end
 
     print(io, str)
@@ -243,9 +244,12 @@ function get_output_cells(cell::LocClosedSet,
     end
     eqns = _dehomogenize(eqns, R)
     for ineqninds in cell.ineqns
-        isempty(ineqninds) && continue
-        ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
-        push!(res, LocallyClosedSet(eqns, ineqns))
+        if isempty(ineqninds)
+            push!(res, LocallyClosedSet(eqns))
+        else
+            ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
+            push!(res, LocallyClosedSet(eqns, ineqns))
+        end
     end
     return res
 end
