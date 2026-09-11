@@ -77,17 +77,37 @@ function _equidimensional_decomposition(I::Ideal{T},
                             Int32[], Int32(0))
     cells = LocClosedSet{FqMPolyRingElem}[]
     cnt = 0
+
+    sys_mons = Vector{MonIdx}[]
+    sys_coeffs = Vector{Coeff}[]
+    basis_ht = initialize_basis_hash_table(Val(ngens(Rhom)))
+    char = zero(Coeff)
+    shift = zero(Cbuf)
+    
     with_logger(logger) do
         while !is_finished(r)
             cnt += 1
             p = Int32(rand_bits_prime(ZZ, 31))
             
             new_prime!(r, p)
-            S, _ = polynomial_ring(GF(p), ["x$i" for i in 1:ngens(Rhom)],
+            S, _ = polynomial_ring(GF(p), ngens(Rhom),
                                    internal_ordering = :degrevlex)
+
             Fhomp = [reduce_mod_p(f, S) for f in Fhom]
             # TODO: just need to overwrite coefficients with new reductions
-            sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
+            if cnt > 1
+                char = Coeff(p)
+                shift = maxshift(char)
+                for (i, f) in enumerate(Fhomp)
+                    for (j, c) in enumerate(coefficients(f))
+                        sys_coeffs[i][j] = Coeff(lift(ZZ, c).d)
+                    end
+                end
+            else
+                sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
+            end
+                
+            # sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
             cells = _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhomp)), r)
             @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> p.is_stable, r.pols))) / $(length(r.pols)) finished"
             isempty(r.pols) && break # catch the case where no splitting happens
