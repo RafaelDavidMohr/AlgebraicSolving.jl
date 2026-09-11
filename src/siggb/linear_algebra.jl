@@ -1,9 +1,9 @@
 function echelonize!(matrix::MacaulayMatrix,
                      tags::Tags,
                      ind_order::IndOrder,
-                     char::Val{Char},
-                     shift::Val{Shift},
-                     tr::Tracer) where {Char, Shift}
+                     char::Coeff,
+                     shift::Cbuf,
+                     tr::Tracer)
 
     arit_ops = 0
 
@@ -61,7 +61,7 @@ function echelonize!(matrix::MacaulayMatrix,
         
         # do the reduction
         @inbounds for j in 1:matrix.ncols
-            a = buffer[j] % Char
+            a = buffer[j] % char
             iszero(a) && continue
             pividx = pivots[j]
             if iszero(pividx) || rev_sigorder[pividx] >= i
@@ -87,7 +87,7 @@ function echelonize!(matrix::MacaulayMatrix,
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
             iszero(buffer[j]) && continue
-            buffer[j] = buffer[j] % Char
+            buffer[j] = buffer[j] % char
             iszero(buffer[j]) && continue
             new_row_length += 1
         end
@@ -137,7 +137,7 @@ end
                                 hash2col::Vector{MonIdx},
                                 pivmons::Vector{MonIdx},
                                 pivcoeffs::Vector{Coeff},
-                                shift::Val{Shift}) where Shift
+                                shift::Cbuf)
     
     @inbounds buffer[bufind] = zero(Cbuf)
     l = length(pivmons)
@@ -152,33 +152,32 @@ end
 
 # helper functions
 # field arithmetic
-function maxshift(::Val{Char}) where Char
+function maxshift(Char::Coeff)
     bufchar = Cbuf(Char)
     return bufchar << leading_zeros(bufchar)
 end
 
 # compute a representation of a - b*c mod char (char ~ Shift)
-@inline function submul(a::Cbuf, b::Cbuf, c::Coeff, ::Val{Shift}) where Shift
+@inline function submul(a::Cbuf, b::Cbuf, c::Coeff, Shift::Cbuf)
     r0 = a - b*Cbuf(c)
-    r1 = r0 + Shift
-    r0 > a ? r1 : r0
+    r0 > a ? r0 + Shift : r0
 end
 
-@inline function inv(a::Coeff, ::Val{Char}) where Char
+@inline function inv(a::Coeff, Char::Coeff)
     return invmod(Cbuf(a), Cbuf(Char)) % Coeff
 end
 
-@inline function addinv(a::Coeff, ::Val{Char}) where Char
+@inline function addinv(a::Coeff, Char::Coeff)
     return Char - a
 end
 
-@inline function mul(a, b, ::Val{Char}) where Char 
+@inline function mul(a, b, Char::Coeff)
     isone(a) && return b
     isone(b) && return a
     return Coeff((Cbuf(a) * Cbuf(b)) % Char)
 end
 
-@inline function add(a, b, ::Val{Char}) where Char
+@inline function add(a, b, Char::Coeff)
     c0 = a + b
     return Coeff(c0 % Char)
     # c1 = c0 - Coeff(Char)

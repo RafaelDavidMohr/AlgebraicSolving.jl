@@ -10,9 +10,9 @@ function update_siggb!(timer::Timings,
                        ind_order::IndOrder,
                        tags::Tags,
                        tr::Tracer,
-                       vchar::Val{Char},
+                       char::Coeff,
                        syz_queue::Vector{SyzInfo},
-                       mod_ord::Symbol=:DPOT) where {N, Char}
+                       mod_ord::Symbol=:DPOT) where N
 
     new_basis_c = 0
     new_syz_c = 0
@@ -51,7 +51,7 @@ function update_siggb!(timer::Timings,
     end
 
     insert_syz_cofacs!(basis, basis_ht, matrix.sigs[cofac_ins_inds],
-                       pairset, vchar, tr, tags, ind_order)
+                       pairset, char, tr, tags, ind_order)
 
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
@@ -191,10 +191,10 @@ function insert_syz_cofacs!(basis::Basis{N},
                             basis_ht::MonomialHashtable{N},
                             syz_sigs::Vector{Sig{N}},
                             pairset::Pairset{N},
-                            vchar::Val{Char},
+                            char::Coeff,
                             tr::Tracer,
                             tags::Tags,
-                            ind_order::IndOrder) where {N, Char}
+                            ind_order::IndOrder) where N
 
     isempty(syz_sigs) && return
     cofacs = Polynomial[]
@@ -211,17 +211,17 @@ function insert_syz_cofacs!(basis::Basis{N},
         cofac = construct_module(new_sig, basis,
                                  basis_ht,
                                  mat_ind, tr,
-                                 vchar,
+                                 char,
                                  ind_order,
                                  new_idx)
         if isempty(cofacs)
             push!(cofacs, cofac)
         else
             cofacs[1] = add_pols(cofac..., cofacs[1]...,
-                                 vchar, rand(one(Coeff):Coeff(Char)))
+                                 char, rand(one(Coeff):Coeff(Char)))
             sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
                        lt = lt_drl, rev = true)
-            normalize_cfs!(cofac[1], vchar)
+            normalize_cfs!(cofac[1], char)
             push!(cofacs, cofac)
         end
     end
@@ -239,7 +239,7 @@ function insert_syz_cofacs!(basis::Basis{N},
         if isone(i)
             sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
                        lt = lt_drl, rev = true)
-            normalize_cfs!(cofac[1], vchar)
+            normalize_cfs!(cofac[1], char)
         end
         new_tg = if tag == :sat
             isone(i) ? :fsatins : :satins
