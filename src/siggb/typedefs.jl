@@ -16,6 +16,8 @@ const Cbuf = UInt64
 # module order
 const ModOrd = Symbol
 
+const INFOONE = LogLevel(1)
+
 struct Monomial{N}
     deg::Exp
     exps::SVector{N, Exp}
@@ -223,7 +225,7 @@ const IndConn = Dict{SigIndex, Vector{SigIndex}}
 
 # For output of decomp algorithms
 mutable struct LocClosedSet{T<:MPolyRingElem}
-    seq::Vector{T}
+    seq::Vector{Tuple{T, Int}} # second entry is a potential index into a table for rational reconstruction
     codim_upper_bound::Int
     gbs::Vector{Vector{T}}
     ineqns::Vector{Vector{Int}}

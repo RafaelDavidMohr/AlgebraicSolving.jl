@@ -3,7 +3,8 @@ function loc_closed_set(seq::Vector{T}) where {T<:MPolyRingElem}
     R = parent(first(seq))
     codim_upper_bound = min(length(seq), ngens(R) - 1)
     gb = saturate(seq, last(gens(R)))
-    return LocClosedSet(seq, codim_upper_bound, [gb], [Int[]])
+    # index 0 indicates that no rational reconstruction will need to be performed
+    return LocClosedSet([(f, 0) for f in seq], codim_upper_bound, [gb], [Int[]])
 end
 
 # basic data
@@ -12,7 +13,7 @@ function num_eqns(X::LocClosedSet)
 end
 
 function ring(X::LocClosedSet)
-    return parent(first(X.seq))
+    return parent(first(first(X.seq)))
 end
 
 # queries
@@ -56,20 +57,21 @@ function add_inequation!(X::LocClosedSet, h::P, r::Registry;
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
         push!(X.ineqns[i], ri)
     end
+    return ri
 end
 
 function add_inequation(X::LocClosedSet, h::MPolyRingElem, r::Registry)
     Y = deepcopy(X)
     if isone(h)
-        return Y
+        return Y, 0
     end
-    add_inequation!(Y, h, r)
-    return Y
+    ri = add_inequation!(Y, h, r)
+    return Y, ri
 end
 
 # which equations are hull equations needs to be managed outside of this function
 function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
-    tim = @elapsed X_min_g = add_inequation(X, g, r)
+    tim = @elapsed X_min_g, ri = add_inequation(X, g, r)
     @info "initial saturation time $(tim)"
 
     X_hull_g = deepcopy(X)
@@ -107,7 +109,7 @@ function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
     deleteat!(X_hull_g.gbs, todel)
     deleteat!(X_hull_g.ineqns, todel)
 
-    return X_hull_g, X_min_g
+    return X_hull_g, X_min_g, ri
 end
 
 function remove!(gb::Vector{P},
@@ -209,7 +211,7 @@ function get_output_cells(cell::LocClosedSet,
                           r::ModularRegistry)
 
     res = LocallyClosedSet{FqMPolyRingElem}[]
-    eqns = _dehomogenize(cell.seq, R)
+    eqns = _dehomogenize(first.(cell.seq), R)
     for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         gb_dehom = _dehomogenize(gb, R)
@@ -230,7 +232,15 @@ function get_output_cells(cell::LocClosedSet,
 
     res = LocallyClosedSet{QQMPolyRingElem}[]
     S = ring(cell)
-    eqns = filter(f -> reduce_mod_p(f, S) in cell.seq, input_eqns)
+    eqns = QQMPolyRingElem[]
+    for (f, i) in cell.seq
+        if iszero(i)
+            inp_ind = findfirst(g -> reduce_mod_p(g, S) == f, input_eqns)
+            push!(eqns, input_eqns[inp_ind])
+        else
+            push!(eqns, get_pol(r, i))
+        end
+    end
     eqns = _dehomogenize(eqns, R)
     for ineqninds in cell.ineqns
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
@@ -321,6 +331,7 @@ function random_lin_comb(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     res = zero(R)
     chr = characteristic(R)
+    chr = iszero(chr) ? 1000 : chr
     for f in F
         res += rand(1:chr-1)*f
     end
