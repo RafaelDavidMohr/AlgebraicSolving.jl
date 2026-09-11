@@ -54,8 +54,9 @@ function _equidimensional_decomposition(I::Ideal{T},
     Fhom = homogenize(F)
     sort!(Fhom, by = p -> total_degree(p))
     r = ModularRegistry(T[])
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhom)
     cells = with_logger(logger) do
-        _sig_decomp(Fhom, r)
+        _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhom)), r)
     end
     res = LocallyClosedSet{T}[]
     R = parent(I)
@@ -85,7 +86,9 @@ function _equidimensional_decomposition(I::Ideal{T},
             S, _ = polynomial_ring(GF(p), ["x$i" for i in 1:ngens(Rhom)],
                                    internal_ordering = :degrevlex)
             Fhomp = [reduce_mod_p(f, S) for f in Fhom]
-            cells = _sig_decomp(Fhomp, r)
+            # TODO: just need to overwrite coefficients with new reductions
+            sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
+            cells = _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhomp)), r)
             @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> p.is_stable, r.pols))) / $(length(r.pols)) finished"
             isempty(r.pols) && break # catch the case where no splitting happens
         end

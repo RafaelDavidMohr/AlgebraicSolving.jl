@@ -126,14 +126,14 @@ end
 function siggb!(basis::Basis{N},
                 pairset::Pairset,
                 basis_ht::MonomialHashtable,
-                char::Val{Char},
-                shift::Val{Shift},
+                char::Coeff,
+                shift::Cbuf,
                 tags::Tags,
                 ind_order::IndOrder,
                 tr::Tracer,
                 timer::Timings,
                 degbound::Int=0,
-                mod_ord::Symbol=:DPOT) where {N, Char, Shift}
+                mod_ord::Symbol=:DPOT) where N
 
     # fake syz queue
     syz_queue = SyzInfo[]
@@ -220,13 +220,19 @@ end
 
 #---------------- functions for splitting --------------------#
 
-function _sig_decomp(sys::Vector{T}, r::Registry) where {T <: MPolyRingElem}
+function _sig_decomp(sys_mons::Vector{Vector{MonIdx}},
+                     sys_coeffs::Vector{Vector{Coeff}},
+                     basis_ht::MonomialHashtable,
+                     char::Coeff,
+                     shift::Cbuf,
+                     R::MPolyRing,
+                     r::Registry)
 
     # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
+    # sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
     
     # fill basis, pairset, tags
-    sysl = length(sys)
+    sysl = length(sys_mons)
     basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
                                                         basis_ht, def_tg=:split,
                                                         trace=Val(true))
@@ -237,7 +243,6 @@ function _sig_decomp(sys::Vector{T}, r::Registry) where {T <: MPolyRingElem}
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
-    R = parent(first(sys))
     timer = new_timer()
     lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
                           tags, ind_order, tr, R, timer, r)
@@ -249,14 +254,14 @@ end
 function sig_decomp!(basis::Basis{N},
                      pairset::Pairset,
                      basis_ht::MonomialHashtable,
-                     char::Val{Char},
-                     shift::Val{Shift},
+                     char::Coeff,
+                     shift::Cbuf,
                      tags::Tags,
                      ind_order::IndOrder,
                      tr::SigTracer,
                      R::MPolyRing,
                      timer::Timings,
-                     r::Registry) where {N, Char, Shift}
+                     r::Registry) where N
 
     # compute ideal
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
@@ -312,10 +317,10 @@ function siggb_for_split!(basis::Basis{N},
                           basis_ht::MonomialHashtable,
                           tr::SigTracer,
                           syz_queue::Vector{SyzInfo},
-                          char::Val{Char},
-                          shift::Val{Shift},
+                          char::Coeff,
+                          shift::Cbuf,
                           lc_set::LocClosedSet,
-                          timer::Timings) where {N, Char, Shift}
+                          timer::Timings) where N
 
     splitting_inds = [index(basis.sigs[i]) for i in 1:basis.input_load]
     filter!(ind -> gettag(tags, ind) == :split, splitting_inds)
@@ -464,11 +469,11 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                                 basis::Basis{N},
                                 tr::SigTracer,
                                 ind_order::IndOrder,
-                                char::Val{Char},
+                                char::Coeff,
                                 lc_set::LocClosedSet,
                                 tags::Tags,
                                 splitting_inds::Vector{SigIndex},
-                                timer::Timings) where {Char, N}
+                                timer::Timings) where N
     
     @info "checking known syzygies"
     found_zd = false
