@@ -261,7 +261,14 @@ mutable struct ReconstructRegistry <: Registry
     curr_ind::Int
     primes::Vector{ZZRingElem}
     current_prime::ZZRingElem
+    pprod::ZZRingElem
+    n_unstable::Int
 end
+
+ReconstructRegistry(R::QQMPolyRing, pols::Vector{ReconstructPol}, curr_ind::Int,
+                    primes::AbstractVector, current_prime) =
+    ReconstructRegistry(R, pols, curr_ind, ZZRingElem.(primes), ZZRingElem(current_prime),
+                        one(ZZ), 0)
 
 mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
     pols::Vector{T}

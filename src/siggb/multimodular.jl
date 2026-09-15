@@ -10,7 +10,7 @@ function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRing)
 end
 
 function is_finished(r::ReconstructRegistry)
-    !isempty(r.pols) && all(p -> all(p.is_stable), r.pols)
+    !isempty(r.pols) && iszero(r.n_unstable)
 end
 
 function get_pol(r::ReconstructRegistry, i::Int)
@@ -31,7 +31,10 @@ function get_pols(r::ModularRegistry, inds::Vector{Int})
 end
 
 function new_prime!(r::ReconstructRegistry, p::Integer)
-    !iszero(r.current_prime) && push!(r.primes, r.current_prime)
+    if !iszero(r.current_prime)
+        push!(r.primes, r.current_prime)
+        r.pprod *= r.current_prime
+    end
     r.current_prime = p
     r.curr_ind = 1
 end
@@ -40,6 +43,15 @@ end
 function does_not_match(pr::ReconstructPol, p::FqMPolyRingElem)
     ev = collect(exponent_vectors(p))
     return length(ev) != length(pr.exps) || first(ev) != first(pr.exps)
+end
+
+attempt_reconstruction(nprimes::Int) = nprimes >= 2 && ispow2(nprimes)
+
+# Check a candidate reconstructed from pprod against a prime not dividing pprod.
+# Multiplying out instead of inverting the denominator means that a denominator
+# divisible by that prime fails the check rather than raising.
+function verifies_mod_p(q::QQFieldElem, r, F)
+    return F(numerator(q)) == r * F(denominator(q))
 end
 
 function ReconstructPol(p::FqMPolyRingElem)
@@ -54,10 +66,15 @@ end
 function update_registry!(reg::ReconstructRegistry,
                           new_pol::FqMPolyRingElem)
 
+
     ri = reg.curr_ind
-    
+
+    @info "updating registry at index $ri"
+
     if length(reg.pols) < ri
-        push!(reg.pols, ReconstructPol(new_pol))
+        new_rp = ReconstructPol(new_pol)
+        push!(reg.pols, new_rp)
+        reg.n_unstable += length(new_rp.is_stable)
         reg.curr_ind += 1
         return ri
     end
@@ -70,31 +87,31 @@ function update_registry!(reg::ReconstructRegistry,
         return ri
     end
 
-
-    pprod = prod(reg.primes)
+    pprod = reg.pprod
     curr_p = reg.current_prime
+    # reconstructing on every prime makes the total cost quadratic in the number
+    # of primes, so only attempt it once pprod is built from 2, 4, 8, ... primes
+    do_reconstruct = attempt_reconstruction(length(reg.primes))
+    F = base_ring(parent(new_pol))
+
     i = 1
     for (ccurr, cnew_fq) in zip(pr.mod_coeffs, coefficients(new_pol))
         if pr.is_stable[i]
             i += 1
             continue
         end
-        cnew = lift(ZZ, cnew_fq)
-        ccurr_new = crt(ZZ(ccurr), ZZ(pprod), ZZ(cnew), ZZ(curr_p))
-        pr.mod_coeffs[i] = ccurr_new
-
-        new_qq_coeff = try
-            reconstruct(ccurr_new, pprod * curr_p)
-        catch
-            zero(QQ)
+        if do_reconstruct
+            success, new_qq_coeff = unsafe_reconstruct(ccurr, pprod)
+            # curr_p was not used to build pprod, so it is an independent check
+            if success && verifies_mod_p(new_qq_coeff, cnew_fq, F)
+                pr.coeff_cands[i] = new_qq_coeff
+                pr.is_stable[i] = true
+                reg.n_unstable -= 1
+                i += 1
+                continue
+            end
         end
-        if new_qq_coeff == pr.coeff_cands[i]
-            pr.is_stable[i] = true
-            i += 1
-            continue
-        end
-        pr.coeff_cands[i] = new_qq_coeff
-
+        pr.mod_coeffs[i] = crt(ccurr, pprod, lift(ZZ, cnew_fq), curr_p)
         i += 1
     end
     reg.curr_ind += 1

@@ -109,7 +109,9 @@ function _equidimensional_decomposition(I::Ideal{T},
                 
             # sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
             cells = _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhomp)), r)
-            @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> all(p.is_stable), r.pols))) / $(length(r.pols)) finished"
+            if ispow2(cnt)
+                @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> all(p.is_stable), r.pols))) / $(length(r.pols)) finished"
+            end
             isempty(r.pols) && break # catch the case where no splitting happens
         end
         res = LocallyClosedSet{T}[]
