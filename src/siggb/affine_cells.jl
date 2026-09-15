@@ -90,7 +90,7 @@ function split(X::LocClosedSet, g::MPolyRingElem, r::Registry)
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
-        H_rand = filter(!iszero, normal_form(isa(r, ModularRegistry) ? random_lin_combs(col_gb) : col_gb, X_gb))
+        H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb, r.rand_coeffs), X_gb))
         isempty(H_rand) && continue
         gbsineqns = remove!(X_gb, H_rand, r, known_eqns = [g])
         for (gb, gb_ineqns) in gbsineqns
@@ -132,11 +132,11 @@ function remove!(gb::Vector{P},
     ri = update_registry!(r, h)
     push!(res, (gb1, [ri]))
     tim1 = @elapsed G = filter(!iszero,
-                               normal_form(isa(r, ModularRegistry) ? random_lin_combs(gb1) : gb1, gb))
+                               normal_form(random_lin_combs(gb1, r.rand_coeffs), gb))
     if isempty(G)
         return res
     end
-    g_rand = random_lin_comb(G)
+    g_rand = random_lin_comb(G, r.rand_coeffs)
     rem_rest = H[2:end]
     tim2 = @elapsed filter!(h -> !iszero(normal_form(h*g_rand, gb)), rem_rest)
     @info "normal forms computed in $(tim1 + tim2)"
@@ -313,15 +313,31 @@ function quotient(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     return res
 end
 
+# kept small: the reconstructed polynomials inherit the height of these
+# coefficients, so larger ones would cost extra primes
+const RAND_COEFF_BOUND = 10000
+
+reset_rand_coeffs!(rc::RandCoeffs) = rc.ind = 1
+
+function next_rand_coeff!(rc::RandCoeffs, K)
+    i = rc.ind
+    while length(rc.coeffs) < i
+        c = rand(1:RAND_COEFF_BOUND)
+        push!(rc.coeffs, rand(Bool) ? c : -c)
+    end
+    rc.ind = i + 1
+    return K(rc.coeffs[i])
+end
+
 # assumes H is sorted by degree
-function random_lin_combs(H::Vector{P}) where {P <: MPolyRingElem}
+function random_lin_combs(H::Vector{P}, rc::RandCoeffs) where {P <: MPolyRingElem}
     res = P[]
-    chr = characteristic(base_ring(first(H)))
+    K = base_ring(first(H))
     curr_deg = total_degree(first(H))
     curr_pol = zero(parent(first(H)))
     for h in H
         if total_degree(h) == curr_deg
-            curr_pol += rand(1:chr-1)*h
+            curr_pol += next_rand_coeff!(rc, K)*h
         else
             push!(res, curr_pol)
             curr_pol = h
@@ -332,13 +348,12 @@ function random_lin_combs(H::Vector{P}) where {P <: MPolyRingElem}
     return res
 end
 
-function random_lin_comb(F::Vector{P}) where {P <: MPolyRingElem}
+function random_lin_comb(F::Vector{P}, rc::RandCoeffs) where {P <: MPolyRingElem}
     R = parent(first(F))
     res = zero(R)
-    chr = characteristic(R)
-    chr = iszero(chr) ? 1000 : chr
+    K = base_ring(R)
     for f in F
-        res += rand(1:chr-1)*f
+        res += next_rand_coeff!(rc, K)*f
     end
     return res
 end
@@ -416,10 +431,12 @@ function variety_string_rep(F::Vector{<:MPolyRingElem};
 end
 
 # check if idls provides ideal-theoretic decomposition of radical of I
-function _check_decomp(I::IDL, idls::Vector{IDL}) where {IDL <: Ideal}
+function _check_decomp(I::IDL, Xs::Vector{<:LocallyClosedSet}) where {IDL <: Ideal}
     gb_ch = I.gens
-    for idl in idls
-        g = random_lin_comb(idl.gens)
+    rc = RandCoeffs()
+    for X in Xs
+        idl = Ideal(X)
+        g = random_lin_comb(idl.gens, rc)
         gb_ch = saturate(gb_ch, g)
     end
     R = parent(I)

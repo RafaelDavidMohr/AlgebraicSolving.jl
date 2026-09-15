@@ -48,8 +48,6 @@ end
 attempt_reconstruction(nprimes::Int) = nprimes >= 2 && ispow2(nprimes)
 
 # Check a candidate reconstructed from pprod against a prime not dividing pprod.
-# Multiplying out instead of inverting the denominator means that a denominator
-# divisible by that prime fails the check rather than raising.
 function verifies_mod_p(q::QQFieldElem, r, F)
     return F(numerator(q)) == r * F(denominator(q))
 end
@@ -89,8 +87,6 @@ function update_registry!(reg::ReconstructRegistry,
 
     pprod = reg.pprod
     curr_p = reg.current_prime
-    # reconstructing on every prime makes the total cost quadratic in the number
-    # of primes, so only attempt it once pprod is built from 2, 4, 8, ... primes
     do_reconstruct = attempt_reconstruction(length(reg.primes))
     F = base_ring(parent(new_pol))
 
