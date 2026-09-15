@@ -255,6 +255,16 @@ end
 
 abstract type Registry end
 
+# coefficients for random linear combinations, drawn in order and replayed from
+# the start for every prime so that each modular run meets the image of one and
+# the same combination over QQ
+mutable struct RandCoeffs
+    coeffs::Vector{Int}
+    ind::Int
+end
+
+RandCoeffs() = RandCoeffs(Int[], 1)
+
 mutable struct ReconstructRegistry <: Registry
     R::QQMPolyRing
     pols::Vector{ReconstructPol}
@@ -263,16 +273,21 @@ mutable struct ReconstructRegistry <: Registry
     current_prime::ZZRingElem
     pprod::ZZRingElem
     n_unstable::Int
+    rand_coeffs::RandCoeffs
 end
 
 ReconstructRegistry(R::QQMPolyRing, pols::Vector{ReconstructPol}, curr_ind::Int,
                     primes::AbstractVector, current_prime) =
     ReconstructRegistry(R, pols, curr_ind, ZZRingElem.(primes), ZZRingElem(current_prime),
-                        one(ZZ), 0)
+                        one(ZZ), 0, RandCoeffs())
 
 mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
     pols::Vector{T}
+    rand_coeffs::RandCoeffs
 end
+
+ModularRegistry(pols::Vector{T}) where {T <: MPolyRingElem} =
+    ModularRegistry{T}(pols, RandCoeffs())
 
 # for user level output of equidimensional decomposition
 mutable struct LocallyClosedSet{T <: MPolyRingElem}

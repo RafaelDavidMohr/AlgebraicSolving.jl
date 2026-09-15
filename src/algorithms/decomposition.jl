@@ -88,13 +88,13 @@ function _equidimensional_decomposition(I::Ideal{T},
         while !is_finished(r)
             cnt += 1
             p = Int32(rand_bits_prime(ZZ, 31))
-            
+
+            reset_rand_coeffs!(r.rand_coeffs)
             new_prime!(r, p)
             S, _ = polynomial_ring(GF(p), ngens(Rhom),
                                    internal_ordering = :degrevlex)
 
             Fhomp = [reduce_mod_p(f, S) for f in Fhom]
-            # TODO: just need to overwrite coefficients with new reductions
             if cnt > 1
                 char = Coeff(p)
                 shift = maxshift(char)
@@ -107,13 +107,13 @@ function _equidimensional_decomposition(I::Ideal{T},
                 sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
             end
                 
-            # sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(Fhomp)
             cells = _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhomp)), r)
             if ispow2(cnt)
-                @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> all(p.is_stable), r.pols))) / $(length(r.pols)) finished"
+                @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> all(p.is_stable), r.pols))) / $(length(r.pols)) polynomials finished"
             end
             isempty(r.pols) && break # catch the case where no splitting happens
         end
+        @logmsg INFOONE "$cnt primes used"
         res = LocallyClosedSet{T}[]
         R = parent(I)
         for cell in cells
