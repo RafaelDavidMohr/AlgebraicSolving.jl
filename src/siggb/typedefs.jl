@@ -250,7 +250,7 @@ mutable struct ReconstructPol
     exps::Vector{Vector{Exp}}
     coeff_cands::Vector{QQFieldElem}
     mod_coeffs::Vector{ZZRingElem}
-    is_stable::Bool
+    is_stable::Vector{Bool}
 end
 
 abstract type Registry end
