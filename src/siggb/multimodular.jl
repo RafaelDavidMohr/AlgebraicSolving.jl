@@ -10,7 +10,7 @@ function reduce_mod_p(f::QQMPolyRingElem, R::FqMPolyRing)
 end
 
 function is_finished(r::ReconstructRegistry)
-    !isempty(r.pols) && all(p -> p.is_stable, r.pols)
+    !isempty(r.pols) && all(p -> all(p.is_stable), r.pols)
 end
 
 function get_pol(r::ReconstructRegistry, i::Int)
@@ -47,7 +47,7 @@ function ReconstructPol(p::FqMPolyRingElem)
     exps = collect(exponent_vectors(p))
     mod_coeffs = (c -> lift(ZZ, c)).(collect(coefficients(p)))
     coeff_cands = (c -> QQ(c)).(mod_coeffs)
-    return ReconstructPol(exps, coeff_cands, mod_coeffs, false)
+    return ReconstructPol(exps, coeff_cands, mod_coeffs, [false for _ in coeff_cands])
 end
 
 # update polynomial at currend index of registry
@@ -65,7 +65,7 @@ function update_registry!(reg::ReconstructRegistry,
     pr = reg.pols[ri]
     does_not_match(pr, new_pol) && error("Bad prime during multi-modular computation.")
 
-    if pr.is_stable
+    if all(pr.is_stable)
         reg.curr_ind += 1
         return ri
     end
@@ -73,9 +73,12 @@ function update_registry!(reg::ReconstructRegistry,
 
     pprod = prod(reg.primes)
     curr_p = reg.current_prime
-    all_is_stable = true
     i = 1
     for (ccurr, cnew_fq) in zip(pr.mod_coeffs, coefficients(new_pol))
+        if pr.is_stable[i]
+            i += 1
+            continue
+        end
         cnew = lift(ZZ, cnew_fq)
         ccurr_new = crt(ZZ(ccurr), ZZ(pprod), ZZ(cnew), ZZ(curr_p))
         pr.mod_coeffs[i] = ccurr_new
@@ -83,19 +86,17 @@ function update_registry!(reg::ReconstructRegistry,
         new_qq_coeff = try
             reconstruct(ccurr_new, pprod * curr_p)
         catch
-            all_is_stable = false
-            pr.coeff_cands[i]
+            zero(QQ)
         end
         if new_qq_coeff == pr.coeff_cands[i]
+            pr.is_stable[i] = true
             i += 1
             continue
         end
-        all_is_stable = false
         pr.coeff_cands[i] = new_qq_coeff
 
         i += 1
     end
-    pr.is_stable = all_is_stable
     reg.curr_ind += 1
     return ri
 end
