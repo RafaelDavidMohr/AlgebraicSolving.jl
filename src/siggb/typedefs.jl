@@ -223,7 +223,7 @@ const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 # For syzygy processing in nondegenerate locus
 const IndConn = Dict{SigIndex, Vector{SigIndex}}
 
-# For output of decomp algorithms
+# internal struct for decomp algorithms
 mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{Tuple{T, Int}} # second entry is a potential index into a table for rational reconstruction
     codim_upper_bound::Int
@@ -293,13 +293,15 @@ ModularRegistry(pols::Vector{T}) where {T <: MPolyRingElem} =
 mutable struct LocallyClosedSet{T <: MPolyRingElem}
     eqns::Vector{T}
     ineqns::Vector{T}
+    dim::Int
     ideal::Union{Ideal{T}, Missing}
 
-    function LocallyClosedSet(eqns::Vector{T}, ineqns::Vector{T}) where {T <: MPolyRingElem}
-        return new{T}(eqns, ineqns, missing)
+    function LocallyClosedSet(eqns::Vector{T}, ineqns::Vector{T},
+                              dim::Int) where {T <: MPolyRingElem}
+        return new{T}(eqns, ineqns, dim, missing)
     end
 
-    function LocallyClosedSet(eqns::Vector{T}) where {T <: MPolyRingElem}
-        return new{T}(eqns, T[], missing)
+    function LocallyClosedSet(eqns::Vector{T}, dim::Int) where {T <: MPolyRingElem}
+        return new{T}(eqns, T[], dim, missing)
     end
 end

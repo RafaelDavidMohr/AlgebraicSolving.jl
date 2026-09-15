@@ -190,6 +190,13 @@ Given a locally closed set `X` of the form $V(F) \ V(g_1 \cdot
 inequations(X::LocallyClosedSet) = X.ineqns
 
 @doc Markdown.doc"""
+    dimension(X::LocallyClosedSet)
+
+Return the dimension of `X`.
+"""
+dimension(X::LocallyClosedSet) = X.dim
+
+@doc Markdown.doc"""
     Ideal(X::LocallyClosedSet)
 
 Return a polynomial ideal `I` whose zero locus coincides with the
@@ -213,10 +220,11 @@ function get_output_cells(cell::LocClosedSet,
 
     res = LocallyClosedSet{FqMPolyRingElem}[]
     eqns = _dehomogenize(first.(cell.seq), R)
+    dim = ngens(R) - cell.codim_upper_bound
     for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
         ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         gb_dehom = _dehomogenize(gb, R)
-        ls = LocallyClosedSet(eqns, ineqns)
+        ls = LocallyClosedSet(eqns, ineqns, dim)
         I = Ideal(gb_dehom)
         I.gb[0] = gb_dehom
         ls.ideal = I
@@ -243,12 +251,13 @@ function get_output_cells(cell::LocClosedSet,
         end
     end
     eqns = _dehomogenize(eqns, R)
+    dim = ngens(R) - cell.codim_upper_bound
     for ineqninds in cell.ineqns
         if isempty(ineqninds)
-            push!(res, LocallyClosedSet(eqns))
+            push!(res, LocallyClosedSet(eqns, dim))
         else
             ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
-            push!(res, LocallyClosedSet(eqns, ineqns))
+            push!(res, LocallyClosedSet(eqns, ineqns, dim))
         end
     end
     return res
