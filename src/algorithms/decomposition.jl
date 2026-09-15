@@ -13,7 +13,7 @@ When the ground field of `I` is the rational numbers, a multi-modular method is 
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input ideal.
-- `info_level::Int=0`: info level printout: off (`0`, default), details about multi-modular computation (`1`), computational details (`2`)
+- `info_level::Int=0`: info level printout: off (`0`, default), details about multi-modular computation (`1`, only relevant when `I` is defined over the rational numbers), computational details (`2`)
 
 # Example
 ```jldoctest
