@@ -34,11 +34,6 @@ function update_siggb!(timer::Timings,
             new_syz_c += 1
             process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr, mod_ord)
             push!(syz_queue, (basis.syz_load, Dict{SigIndex, Bool}()))
-
-            # for cofactor insertion in ndeg computation
-            if gettag(tags, index(new_sig)) in [:ndeg, :sat]
-                push!(cofac_ins_inds, i)
-            end
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -49,9 +44,6 @@ function update_siggb!(timer::Timings,
                                          tr, ind_order, tags, mod_ord, timer)
         end
     end
-
-    insert_syz_cofacs!(basis, basis_ht, matrix.sigs[cofac_ins_inds],
-                       pairset, char, tr, tags, ind_order)
 
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
@@ -124,11 +116,6 @@ function add_basis_elem!(basis::Basis{N},
     insert!(diagram_data, insind, l+1)
     diagram_data[1] += 1
 
-    # if an existing sig further reduced we dont need the old element
-    # if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
-    #     basis.is_red[parent_ind] = true
-    # end 
-
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
     basis.basis_load = l
 
@@ -185,72 +172,6 @@ function process_syzygy!(basis::Basis,
 
     # remove pairs that became rewriteable in previous loop
     remove_red_pairs!(pairset)
-end
-
-function insert_syz_cofacs!(basis::Basis{N},
-                            basis_ht::MonomialHashtable{N},
-                            syz_sigs::Vector{Sig{N}},
-                            pairset::Pairset{N},
-                            char::Coeff,
-                            tr::Tracer,
-                            tags::Tags,
-                            ind_order::IndOrder) where N
-
-    isempty(syz_sigs) && return
-    cofacs = Polynomial[]
-    mat_ind = length(tr.mats)
-    syz_ind = index(first(syz_sigs))
-
-    # we only use this in nondeg computation
-    @assert length(unique([index(s) for s in syz_sigs])) == 1
-
-    # construct cofactors of zero reduction and ins in hashtable
-    for new_sig in syz_sigs
-        new_idx = index(new_sig)
-        @info "constructing module"
-        cofac = construct_module(new_sig, basis,
-                                 basis_ht,
-                                 mat_ind, tr,
-                                 char,
-                                 ind_order,
-                                 new_idx)
-        if isempty(cofacs)
-            push!(cofacs, cofac)
-        else
-            cofacs[1] = add_pols(cofac..., cofacs[1]...,
-                                 char, rand(one(Coeff):Coeff(Char)))
-            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
-                       lt = lt_drl, rev = true)
-            normalize_cfs!(cofac[1], char)
-            push!(cofacs, cofac)
-        end
-    end
-
-    # insert cofactors in system
-    tag = gettag(tags, index(first(syz_sigs)))
-    new_f_idx = zero(SigIndex)
-    for (i, cofac) in enumerate(cofacs)
-        ord_ind = if tag == :sat
-            sat_inds = findall(tag -> tag == :sat, tags)
-            findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)[1]
-        else
-            ind_order.ord[syz_ind]
-        end
-        if isone(i)
-            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
-                       lt = lt_drl, rev = true)
-            normalize_cfs!(cofac[1], char)
-        end
-        new_tg = if tag == :sat
-            isone(i) ? :fsatins : :satins
-        else
-            isone(i) ? :fndegins : :ndegins
-        end
-        new_ind = add_new_sequence_element!(basis, basis_ht, tr, cofac...,
-                                            ind_order, ord_ind, pairset,
-                                            tags,
-                                            new_tg = new_tg)
-    end
 end
 
 # construct all pairs with basis element at new_basis_idx
@@ -391,7 +312,6 @@ function minimize!(basis::Basis{N},
     @inbounds for i in basis.basis_offset:basis.basis_load
         bsi = index(basis.sigs[i])
         !iszero(idx_bound) && cmp_ind_str(idx_bound, bsi, ind_order) && continue
-        gettag(tags, bsi) == :sat && continue
         if j > sz
             sz *= 2
             resize!(min_data, sz)

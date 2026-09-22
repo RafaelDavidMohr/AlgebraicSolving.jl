@@ -151,13 +151,13 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        tim = @elapsed _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
-                                                              basis_ht, symbol_ht,
-                                                              ind_order, tags,
-                                                              mod_ord)
+        tim = @elapsed _, sigind = select_normal!(pairset, basis, matrix,
+                                                  basis_ht, symbol_ht,
+                                                  ind_order, tags,
+                                                  mod_ord)
         timer.select_time += tim
         tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
-                                    ind_order, tags, sigind, compat_ind,
+                                    ind_order, tags, sigind,
                                     mod_ord)
         timer.sym_pp_time += tim
         finalize_matrix!(matrix, symbol_ht, ind_order)
@@ -180,31 +180,6 @@ function siggb!(basis::Basis{N},
 
         p_idx = iszero(pairset.load) ? zero(SigIndex) : index(first(pairset.elems).top_sig)
         if mod_ord == :POT && (iszero(p_idx) || cmp_ind_str(curr_ind, p_idx, ind_order))
-
-            # possible nonzero condition to append in nondeg computation
-            if gettag(tags, curr_ind) == :fndegins
-                nz_cfs, nz_mons = Coeff[], MonIdx[]
-                for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
-                    if index(syz_msk) == curr_ind
-                        to_add_cfs, to_add_mns = construct_module((curr_ind, basis.syz_sigs[j]),
-                                                                  basis,
-                                                                  basis_ht,
-                                                                  tr.syz_ind_to_mat[j],
-                                                                  tr,
-                                                                  char,
-                                                                  ind_order, curr_ind)
-                        mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(Char-1)),
-                                      char)
-                        nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
-                                                   to_add_cfs, to_add_mns, char)
-                    end
-                end
-                is_one((nz_cfs, nz_mons), basis_ht) && continue
-                sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
-                           lt = lt_drl, rev = true)
-                normalize_cfs!(nz_cfs, char)
-                push!(nz_conds, (nz_cfs, nz_mons))
-            end
 
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
@@ -348,8 +323,8 @@ function siggb_for_split!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        tim = @elapsed deg, _, _ = select_normal!(pairset, basis, matrix,
-                                                  basis_ht, symbol_ht, ind_order, tags)
+        tim = @elapsed deg, _ = select_normal!(pairset, basis, matrix,
+                                               basis_ht, symbol_ht, ind_order, tags)
         timer.select_time += tim
         tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags)
