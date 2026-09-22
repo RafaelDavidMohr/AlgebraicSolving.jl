@@ -9,6 +9,8 @@ function new_tracer()
                      init_basis_size)
 end
 
+is_complete(tr::SigTracer) = tr.is_complete
+
 function new_tr_mat(nrows::Int,
                     tr::SigTracer)
 
@@ -102,6 +104,8 @@ function shift_tracer!(tr::SigTracer, shift::Int,
 end                    
 
 # dummy methods if we don't want to trace
+is_complete(tr::NoTracer) = false
+
 function new_tr_mat(nrows::Int,
                     tr::NoTracer)
 

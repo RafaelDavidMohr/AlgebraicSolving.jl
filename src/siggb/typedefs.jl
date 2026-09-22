@@ -205,6 +205,7 @@ mutable struct SigTracer <: Tracer
     syz_ind_to_mat::Vector{Int}
     load::Int
     size::Int
+    is_complete::Bool # this is `true` if data from a complete sigGB run is stored
 end
 
 # For Index ordering
