@@ -222,9 +222,13 @@ function get_output_cells(cell::LocClosedSet,
     eqns = _dehomogenize(first.(cell.seq), R)
     dim = ngens(R) - cell.codim_upper_bound
     for (gb, ineqninds) in zip(cell.gbs, cell.ineqns)
-        ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
         gb_dehom = _dehomogenize(gb, R)
-        ls = LocallyClosedSet(eqns, ineqns, dim)
+        ls = if isempty(ineqninds)
+            LocallyClosedSet(eqns, dim)
+        else
+            ineqns = unique(_dehomogenize(get_pols(r, ineqninds), R))
+            LocallyClosedSet(eqns, ineqns, dim)
+        end
         I = Ideal(gb_dehom)
         I.gb[0] = gb_dehom
         ls.ideal = I
