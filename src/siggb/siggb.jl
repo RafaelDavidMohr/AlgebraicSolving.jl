@@ -91,9 +91,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         timer = new_timer()
-        _, arit_ops, _ = siggb!(basis, pairset, basis_ht, char, shift,
-                                tags, ind_order, tr, timer, degbound,
-                                mod_ord)
+        _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
+                             tags, ind_order, tr, timer, degbound,
+                             mod_ord)
         @info "$(arit_ops) total submul's"
         @info timer
         @info "Size of the mdd: $(number_of_distinct_nodes(basis.lm_diagram))"
@@ -138,8 +138,6 @@ function siggb!(basis::Basis{N},
     # fake syz queue
     syz_queue = SyzInfo[]
     arit_ops = 0
-
-    nz_conds = Polynomial[]
 
     sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
@@ -190,7 +188,19 @@ function siggb!(basis::Basis{N},
             end
         end
     end
-    return false, arit_ops, nz_conds
+    return false, arit_ops
+end
+
+function apply_tracer!(basis::Basis{N},
+                       basis_ht::MonomialHashtable,
+                       char::Coeff,
+                       shift::Cbuf,
+                       tags::Tags,
+                       ind_order::IndOrder,
+                       tr::Tracer,
+                       timer::Timings,
+                       degbound::Int=0,
+                       mod_ord::Symbol=:DPOT) where N
 end
 
 #---------------- functions for splitting --------------------#
