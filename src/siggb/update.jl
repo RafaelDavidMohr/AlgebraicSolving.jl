@@ -20,8 +20,6 @@ function update_siggb!(timer::Timings,
     toadd = matrix.toadd[1:matrix.toadd_length]
     added_unit = false
 
-    cofac_ins_inds = Int[]
-
     @inbounds for i in toadd
         # determine if row is zero
         row = matrix.rows[i]
@@ -123,7 +121,7 @@ function add_basis_elem!(basis::Basis{N},
     store_basis_elem!(tr, new_sig, l, basis.basis_size)
     
     # build new pairs
-    update_pairset!(timer, pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
+    !is_complete(tr) && update_pairset!(timer, pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
 
     return false
 end
@@ -156,22 +154,23 @@ function process_syzygy!(basis::Basis,
     store_syz!(tr)
 
     # kill pairs with known syz signature
-    @inbounds for j in 1:pairset.load
-        p = pairset.elems[j]
-        cond = index(p.top_sig) == new_idx
-        if cond && divch(new_sig_mon, monomial(p.top_sig),
-                         new_sig_mask[2], p.top_sig_mask)
-            pairset.elems[j].top_index = 0
+    if !is_complete(tr)
+        @inbounds for j in 1:pairset.load
+            p = pairset.elems[j]
+            cond = index(p.top_sig) == new_idx
+            if cond && divch(new_sig_mon, monomial(p.top_sig),
+                             new_sig_mask[2], p.top_sig_mask)
+                pairset.elems[j].top_index = 0
+            end
+            cond = index(p.bot_sig) == new_idx && (mod_ord == :DPOT || index(p.bot_sig) == index(p.top_sig))
+            if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                             new_sig_mask[2], p.bot_sig_mask)
+                pairset.elems[j].top_index = 0
+            end
         end
-        cond = index(p.bot_sig) == new_idx && (mod_ord == :DPOT || index(p.bot_sig) == index(p.top_sig))
-        if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                         new_sig_mask[2], p.bot_sig_mask)
-            pairset.elems[j].top_index = 0
-        end
+        # remove pairs that became rewriteable in previous loop
+        remove_red_pairs!(pairset)
     end
-
-    # remove pairs that became rewriteable in previous loop
-    remove_red_pairs!(pairset)
 end
 
 # construct all pairs with basis element at new_basis_idx

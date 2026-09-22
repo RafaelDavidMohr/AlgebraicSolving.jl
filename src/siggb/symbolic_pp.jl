@@ -315,9 +315,7 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable,
-                          ind_order::IndOrder,
-                          sigind::SigIndex=zero(SigIndex),
-                          mod_ord::Symbol=:DPOT)
+                          ind_order::IndOrder)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -344,18 +342,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
 
-    lt_mat = (sig1, sig2) -> begin
-        if mod_ord == :POT
-            i1, i2 = index(sig1), index(sig2)
-            if cmp_ind_str(i1, sigind, ind_order) && cmp_ind_str(i2, sigind, ind_order)
-                true
-            else
-                lt_pot(sig1, sig2, ind_order)
-            end
-        else
-            lt_pot(sig1, sig2, ind_order)
-        end
-    end
+    lt_mat = (sig1, sig2) -> lt_pot(sig1, sig2, ind_order)
     
     @inbounds sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
                         lt = lt_mat)

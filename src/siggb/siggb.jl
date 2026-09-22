@@ -171,7 +171,7 @@ function siggb!(basis::Basis{N},
                                                       tr, char, syz_queue, mod_ord)
             timer.update_time += tim
             if added_unit
-                return true, arit_ops, nz_conds
+                return true, arit_ops
             end
             sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
         end
@@ -199,8 +199,39 @@ function apply_tracer!(basis::Basis{N},
                        ind_order::IndOrder,
                        tr::Tracer,
                        timer::Timings,
-                       degbound::Int=0,
                        mod_ord::Symbol=:DPOT) where N
+
+
+    @assert mod_ord == :DPOT "Tracing only implemented with DPOT"
+    
+    # fake syz queue
+    syz_queue = SyzInfo[]
+    arit_ops = 0
+
+    # not used
+    pairset = init_pairset(Val(N))
+
+    current_tr_index = 1
+    while current_tr_index < length(tr.mats)
+
+        symbol_ht = initialize_secondary_hash_table(basis_ht)
+        matrix = construct_matrix!(tr, basis, symbol_ht, basis_ht, ind_order, current_tr_index)
+
+        tim = @elapsed arit_ops_new = echelonize!(matrix, tags, ind_order, char,
+                                                  shift, tr)
+        arit_ops += arit_ops_new
+        timer.lin_alg_time += tim
+
+        tim = @elapsed added_unit = update_siggb!(timer, basis, matrix, pairset, symbol_ht,
+                                                  basis_ht, ind_order, tags,
+                                                  tr, char, syz_queue, mod_ord)
+        timer.update_time += tim
+        if added_unit
+            return true, arit_ops
+        end
+        current_tr_index += 1
+    end
+    return false, arit_ops
 end
 
 #---------------- functions for splitting --------------------#

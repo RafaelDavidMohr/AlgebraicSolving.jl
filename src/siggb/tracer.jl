@@ -6,7 +6,7 @@ function new_tracer()
     syz_ind_to_mat = Int[]
     return SigTracer(mats, basis_ind_to_mat,
                      syz_ind_to_mat, 0,
-                     init_basis_size)
+                     init_basis_size, false)
 end
 
 is_complete(tr::SigTracer) = tr.is_complete
@@ -53,6 +53,7 @@ function store_inver!(tr_mat::SigTracerMatrix,
                       row_ind::Int,
                       inver::Coeff)
 
+    is_complete(tr) && return
     tr_mat.diagonal[row_ind] = inver
 end
 
@@ -60,6 +61,8 @@ function store_basis_elem!(tr::SigTracer,
                            new_sig::Sig,
                            bas_ind::Int,
                            bas_sz::Int)
+
+    is_complete(tr) && return
 
     if tr.size != bas_sz
         tr.size = bas_sz
@@ -101,7 +104,25 @@ function shift_tracer!(tr::SigTracer, shift::Int,
             end
         end
     end
-end                    
+end                
+
+function construct_matrix!(tr::SigTracer,
+                           basis::Basis{N},
+                           symbol_ht::MonomialHashtable{N},
+                           ht::MonomialHashtable{N},
+                           ind_order::IndOrder,
+                           index::Int) where N
+
+    tr_mat = tr.mats[index]
+    nrows = length(tr_mat.rows)
+    mat = initialize_matrix(Val(N), nrows)
+    @inbounds for (sig, (_, basis_index)) in tr_mat.rows
+        mult = div(monomial(sig), monomial(basis.sigs[basis_index]))
+        write_to_matrix_row!(mat, basis, basis_index, symbol_ht, ht, mult, sig)
+    end
+    finalize_matrix!(mat, symbol_ht, ind_order)
+    return mat
+end
 
 # dummy methods if we don't want to trace
 is_complete(tr::NoTracer) = false

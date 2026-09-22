@@ -29,8 +29,8 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # store tracer data
         row_sig = matrix.sigs[row_ind]
-        add_row!(tr_mat, row_sig, row_ind,
-                 matrix.parent_inds[row_ind])
+        !is_complete(tr) && add_row!(tr_mat, row_sig, row_ind,
+                                     matrix.parent_inds[row_ind])
 
         does_red = false
         row_cols = matrix.rows[row_ind]
@@ -73,7 +73,7 @@ function echelonize!(matrix::MacaulayMatrix,
                 continue
             end
 
-            store_row_op!(tr_mat, row_ind, pividx, a)
+            !is_complete(tr) && store_row_op!(tr_mat, row_ind, pividx, a)
 
             # subtract a*rows[pivots[j]] from buffer
             pivmons = matrix.rows[pividx]
@@ -109,7 +109,7 @@ function echelonize!(matrix::MacaulayMatrix,
             j += 1
         end
         # store that we normalized the row
-        store_inver!(tr_mat, row_ind, inver)
+        !is_complete(tr) && store_inver!(tr_mat, row_ind, inver)
 
         # check if row lead reduced
         @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1])

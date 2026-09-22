@@ -234,18 +234,22 @@ function resize_pairset!(pairset::Pairset, nnew::Int)
     end
 end
 
-function initialize_matrix(::Val{N}) where {N}
-    rows = Vector{Vector{MonIdx}}(undef, 0)
-    pivots = Vector{Int}(undef, 0)
-    pivot_size = 0
-    sigs = Vector{Sig{N}}(undef, 0)
-    parent_inds = Vector{Int}(undef, 0)
+function initialize_matrix(::Val{N}, nrows=0::Int) where {N}
+    rows = Vector{Vector{MonIdx}}(undef, nrows)
+    pivots = Vector{Int}(undef, nrows)
+    pivot_size = nrows
+    sigs = Vector{Sig{N}}(undef, nrows)
+    parent_inds = Vector{Int}(undef, nrows)
     sig_order = Vector{Int}(undef, 0)
     col2hash = Vector{ColIdx}(undef, 0)
-    coeffs = Vector{Vector{Coeff}}(undef, 0)
-    toadd = Vector{Int}(undef, 0)
+    coeffs = Vector{Vector{Coeff}}(undef, nrows)
+    toadd = Vector{Int}(undef, nrows)
 
-    size = 0
+    for i in 1:nrows
+        toadd[i] = 0
+    end
+
+    size = nrows
     nrows = 0
     ncols = 0
     toadd_length = 0
@@ -269,7 +273,7 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     resize!(matrix.parent_inds, matrix.size)
     resize!(matrix.coeffs, matrix.size)
     resize!(matrix.toadd, matrix.size)
-    for i in 1:npairs
+    for i in 1:2*npairs
         matrix.toadd[i] = 0
     end
     return matrix
