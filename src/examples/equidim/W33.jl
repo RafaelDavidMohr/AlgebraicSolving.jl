@@ -8,22 +8,27 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "W33"
 
-function build_system(K)
-    _, (a43, a42, a41, a32, a31, a21, b1, b2, b3, b4, c4, c3, c2) = polynomial_ring(K, ["a43", "a42", "a41", "a32", "a31", "a21", "b1", "b2", "b3", "b4", "c4", "c3", "c2"])
-    return [
-        b1 + b2 + b3 + b4 - 1,
-        -a21 + c2,
-        -a32 - a31 + c3,
-        -a43 - a42 - a41 + c4,
-        2*b2*c2 + 2*b3*c3 + 2*b4*c4 - 1,
-        3*b2*c2^2 + 3*b3*c3^2 + 3*b4*c4^2 - 1,
-        6*a43*b4*c3 + 6*a42*b4*c2 + 6*a32*b3*c2 - 1,
-        4*b2*c2^3 + 4*b3*c3^3 + 4*b4*c4^3 - 1,
-        8*a43*b4*c4*c3 + 8*a42*b4*c4*c2 + 8*a32*b3*c3*c2 - 1,
-        12*a43*b4*c3^2 + 12*a42*b4*c2^2 + 12*a32*b3*c2^2 - 1,
-        24*a43*a32*b4*c2 - 1
-    ]
-end
+R, (a43, a42, a41, a32, a31, a21, b1, b2, b3, b4, c4, c3, c2) = polynomial_ring(QQ, ["a43", "a42", "a41", "a32", "a31", "a21", "b1", "b2", "b3", "b4", "c4", "c3", "c2"])
+
+F = [
+    b1 + b2 + b3 + b4 - 1,
+    -a21 + c2,
+    -a32 - a31 + c3,
+    -a43 - a42 - a41 + c4,
+    2*b2*c2 + 2*b3*c3 + 2*b4*c4 - 1,
+    3*b2*c2^2 + 3*b3*c3^2 + 3*b4*c4^2 - 1,
+    6*a43*b4*c3 + 6*a42*b4*c2 + 6*a32*b3*c2 - 1,
+    4*b2*c2^3 + 4*b3*c3^3 + 4*b4*c4^3 - 1,
+    8*a43*b4*c4*c3 + 8*a42*b4*c4*c2 + 8*a32*b3*c3*c2 - 1,
+    12*a43*b4*c3^2 + 12*a42*b4*c2^2 + 12*a32*b3*c2^2 - 1,
+    24*a43*a32*b4*c2 - 1
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["a43", "a42", "a41", "a32", "a31", "a21", "b1", "b2", "b3", "b4", "c4", "c3", "c2"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -34,7 +39,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -42,17 +46,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

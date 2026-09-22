@@ -8,46 +8,51 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "Sys2873"
 
-function build_system(K)
-    _, (x_1, x_10, x_11, x_12, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9) = polynomial_ring(K, ["x_1", "x_10", "x_11", "x_12", "x_2", "x_3", "x_4", "x_5", "x_6", "x_7", "x_8", "x_9"])
-    return [
-        -x_10^2,
-        -x_12^2,
-        -x_3^2,
-        -2*x_10*x_11,
-        -2*x_11*x_12,
-        -2*x_2*x_3,
-        -2*x_3*x_6,
-        -2*x_12*x_9,
-        -2*x_10*x_7 + x_11,
-        -x_1^2 + x_4,
-        -2*x_1*x_2 + x_5,
-        -2*x_10*x_12 - x_11^2,
-        -2*x_3*x_9 - x_6^2,
-        -2*x_1*x_4 + 2*x_7,
-        -2*x_11*x_9 - 2*x_12*x_8,
-        -2*x_2*x_6 - 2*x_3*x_5,
-        -2*x_12*x_3 - 2*x_6*x_9,
-        -2*x_12*x_6 - x_9^2,
-        -2*x_1*x_3 - x_2^2 + x_6,
-        -2*x_1*x_10 - 2*x_4*x_7 + x_5,
-        -2*x_10*x_8 - 2*x_11*x_7 + 2*x_12,
-        -2*x_10*x_4 - x_7^2 + x_8,
-        -2*x_1*x_5 - 2*x_2*x_4 + 2*x_8,
-        -2*x_10*x_9 - 2*x_11*x_8 - 2*x_12*x_7,
-        -2*x_2*x_9 - 2*x_3*x_8 - 2*x_5*x_6,
-        -2*x_11*x_6 - 2*x_12*x_5 - 2*x_8*x_9,
-        -2*x_1*x_7 + 3*x_10 + x_2 - x_4^2,
-        -2*x_1*x_6 - 2*x_2*x_5 - 2*x_3*x_4 + 2*x_9,
-        -2*x_10*x_5 - 2*x_11*x_4 - 2*x_7*x_8 + 2*x_9,
-        -2*x_11*x_3 - 2*x_12*x_2 - 2*x_5*x_9 - 2*x_6*x_8,
-        -2*x_1*x_11 - 2*x_10*x_2 - 2*x_4*x_8 - 2*x_5*x_7 + 2*x_6,
-        -2*x_1*x_8 + 3*x_11 - 2*x_2*x_7 + 2*x_3 - 2*x_4*x_5,
-        -2*x_10*x_6 - 2*x_11*x_5 - 2*x_12*x_4 - 2*x_7*x_9 - x_8^2,
-        -2*x_1*x_9 + 3*x_12 - 2*x_2*x_8 - 2*x_3*x_7 - 2*x_4*x_6 - x_5^2,
-        -2*x_1*x_12 - 2*x_10*x_3 - 2*x_11*x_2 - 2*x_4*x_9 - 2*x_5*x_8 - 2*x_6*x_7
-    ]
-end
+R, (x_1, x_10, x_11, x_12, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9) = polynomial_ring(QQ, ["x_1", "x_10", "x_11", "x_12", "x_2", "x_3", "x_4", "x_5", "x_6", "x_7", "x_8", "x_9"])
+
+F = [
+    -x_10^2,
+    -x_12^2,
+    -x_3^2,
+    -2*x_10*x_11,
+    -2*x_11*x_12,
+    -2*x_2*x_3,
+    -2*x_3*x_6,
+    -2*x_12*x_9,
+    -2*x_10*x_7 + x_11,
+    -x_1^2 + x_4,
+    -2*x_1*x_2 + x_5,
+    -2*x_10*x_12 - x_11^2,
+    -2*x_3*x_9 - x_6^2,
+    -2*x_1*x_4 + 2*x_7,
+    -2*x_11*x_9 - 2*x_12*x_8,
+    -2*x_2*x_6 - 2*x_3*x_5,
+    -2*x_12*x_3 - 2*x_6*x_9,
+    -2*x_12*x_6 - x_9^2,
+    -2*x_1*x_3 - x_2^2 + x_6,
+    -2*x_1*x_10 - 2*x_4*x_7 + x_5,
+    -2*x_10*x_8 - 2*x_11*x_7 + 2*x_12,
+    -2*x_10*x_4 - x_7^2 + x_8,
+    -2*x_1*x_5 - 2*x_2*x_4 + 2*x_8,
+    -2*x_10*x_9 - 2*x_11*x_8 - 2*x_12*x_7,
+    -2*x_2*x_9 - 2*x_3*x_8 - 2*x_5*x_6,
+    -2*x_11*x_6 - 2*x_12*x_5 - 2*x_8*x_9,
+    -2*x_1*x_7 + 3*x_10 + x_2 - x_4^2,
+    -2*x_1*x_6 - 2*x_2*x_5 - 2*x_3*x_4 + 2*x_9,
+    -2*x_10*x_5 - 2*x_11*x_4 - 2*x_7*x_8 + 2*x_9,
+    -2*x_11*x_3 - 2*x_12*x_2 - 2*x_5*x_9 - 2*x_6*x_8,
+    -2*x_1*x_11 - 2*x_10*x_2 - 2*x_4*x_8 - 2*x_5*x_7 + 2*x_6,
+    -2*x_1*x_8 + 3*x_11 - 2*x_2*x_7 + 2*x_3 - 2*x_4*x_5,
+    -2*x_10*x_6 - 2*x_11*x_5 - 2*x_12*x_4 - 2*x_7*x_9 - x_8^2,
+    -2*x_1*x_9 + 3*x_12 - 2*x_2*x_8 - 2*x_3*x_7 - 2*x_4*x_6 - x_5^2,
+    -2*x_1*x_12 - 2*x_10*x_3 - 2*x_11*x_2 - 2*x_4*x_9 - 2*x_5*x_8 - 2*x_6*x_7
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["x_1", "x_10", "x_11", "x_12", "x_2", "x_3", "x_4", "x_5", "x_6", "x_7", "x_8", "x_9"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -58,7 +63,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -66,17 +70,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

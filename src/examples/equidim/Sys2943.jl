@@ -8,21 +8,26 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "Sys2943"
 
-function build_system(K)
-    _, (Y, c12, c13, c23, d12, d13, d23, s12, s13, s23, t12, t13, t23) = polynomial_ring(K, ["Y", "c12", "c13", "c23", "d12", "d13", "d23", "s12", "s13", "s23", "t12", "t13", "t23"])
-    return [
-        c12*t12 - s12,
-        c13*t13 - s13,
-        c23*t23 - s23,
-        c12^2 + s12^2 - 1,
-        c13^2 + s13^2 - 1,
-        c23^2 + s23^2 - 1,
-        -2*c12*d13*d23 - d12^2 + d13^2 + d23^2,
-        -2*c13*d12*d23 + d12^2 - d13^2 + d23^2,
-        -2*c23*d12*d13 + d12^2 + d13^2 - d23^2,
-        Y*d12*d13*d23 - 1
-    ]
-end
+R, (Y, c12, c13, c23, d12, d13, d23, s12, s13, s23, t12, t13, t23) = polynomial_ring(QQ, ["Y", "c12", "c13", "c23", "d12", "d13", "d23", "s12", "s13", "s23", "t12", "t13", "t23"])
+
+F = [
+    c12*t12 - s12,
+    c13*t13 - s13,
+    c23*t23 - s23,
+    c12^2 + s12^2 - 1,
+    c13^2 + s13^2 - 1,
+    c23^2 + s23^2 - 1,
+    -2*c12*d13*d23 - d12^2 + d13^2 + d23^2,
+    -2*c13*d12*d23 + d12^2 - d13^2 + d23^2,
+    -2*c23*d12*d13 + d12^2 + d13^2 - d23^2,
+    Y*d12*d13*d23 - 1
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["Y", "c12", "c13", "c23", "d12", "d13", "d23", "s12", "s13", "s23", "t12", "t13", "t23"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -33,7 +38,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -41,17 +45,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

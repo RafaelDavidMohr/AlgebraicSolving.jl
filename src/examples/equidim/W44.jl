@@ -8,30 +8,35 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "W44"
 
-function build_system(K)
-    _, (A0, A2, A3, A4, A5, B0, B1, B2, B3, B4, B5, C0, C1, C2, C3, C4, C5) = polynomial_ring(K, ["A0", "A2", "A3", "A4", "A5", "B0", "B1", "B2", "B3", "B4", "B5", "C0", "C1", "C2", "C3", "C4", "C5"])
-    return [
-        A2*B2,
-        A4*B4,
-        A5*B5,
-        A2*B1 + B2,
-        A4*B1 + B4,
-        A2*B4 + A4*B2,
-        A3*B5 + A5*B3,
-        A4*B5 + A5*B4,
-        A3*B5 + A5*B3 + 2*A5*B5,
-        2*A3*B3 + A3*B5 + A5*B3,
-        A3*B3 + A3*B5 + A5*B3 + A5*B5,
-        A3*B4 + A4*B3 + A5*B1 + B5,
-        A0*B2 + A2*B0 + A2*B1 + A2*B4 + A4*B2 + B2 + C2,
-        A0*B1 + A2*B3 + A3*B2 + A4*B1 + B0 + 2*B1 + B4 + C1,
-        A0*B4 + A2*B5 + A4*B0 + A4*B1 + 2*A4*B4 + A5*B2 + B4 + C4,
-        A0*B3 + A3*B0 + 2*A3*B1 + A3*B4 + A4*B3 + A5*B1 + 2*B3 + B5 + C3,
-        A0*B5 + A3*B4 + A4*B3 + 2*A4*B5 + A5*B0 + A5*B1 + 2*A5*B4 + B5 + C5,
-        A0*B3 + A0*B5 + A3*B0 + A3*B1 + A3*B4 + A4*B3 + A4*B5 + A5*B0 + A5*B1 + A5*B4 + B3 + B5 + C3 + C5 - 1,
-        A0*B0 + A0*B1 + A0*B4 + A2*B3 + A2*B5 + A3*B2 + A4*B0 + A4*B1 + A4*B4 + A5*B2 + B0 + B1 + B4 + C0 + C1 + C4
-    ]
-end
+R, (A0, A2, A3, A4, A5, B0, B1, B2, B3, B4, B5, C0, C1, C2, C3, C4, C5) = polynomial_ring(QQ, ["A0", "A2", "A3", "A4", "A5", "B0", "B1", "B2", "B3", "B4", "B5", "C0", "C1", "C2", "C3", "C4", "C5"])
+
+F = [
+    A2*B2,
+    A4*B4,
+    A5*B5,
+    A2*B1 + B2,
+    A4*B1 + B4,
+    A2*B4 + A4*B2,
+    A3*B5 + A5*B3,
+    A4*B5 + A5*B4,
+    A3*B5 + A5*B3 + 2*A5*B5,
+    2*A3*B3 + A3*B5 + A5*B3,
+    A3*B3 + A3*B5 + A5*B3 + A5*B5,
+    A3*B4 + A4*B3 + A5*B1 + B5,
+    A0*B2 + A2*B0 + A2*B1 + A2*B4 + A4*B2 + B2 + C2,
+    A0*B1 + A2*B3 + A3*B2 + A4*B1 + B0 + 2*B1 + B4 + C1,
+    A0*B4 + A2*B5 + A4*B0 + A4*B1 + 2*A4*B4 + A5*B2 + B4 + C4,
+    A0*B3 + A3*B0 + 2*A3*B1 + A3*B4 + A4*B3 + A5*B1 + 2*B3 + B5 + C3,
+    A0*B5 + A3*B4 + A4*B3 + 2*A4*B5 + A5*B0 + A5*B1 + 2*A5*B4 + B5 + C5,
+    A0*B3 + A0*B5 + A3*B0 + A3*B1 + A3*B4 + A4*B3 + A4*B5 + A5*B0 + A5*B1 + A5*B4 + B3 + B5 + C3 + C5 - 1,
+    A0*B0 + A0*B1 + A0*B4 + A2*B3 + A2*B5 + A3*B2 + A4*B0 + A4*B1 + A4*B4 + A5*B2 + B0 + B1 + B4 + C0 + C1 + C4
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["A0", "A2", "A3", "A4", "A5", "B0", "B1", "B2", "B3", "B4", "B5", "C0", "C1", "C2", "C3", "C4", "C5"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -42,7 +47,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -50,17 +54,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

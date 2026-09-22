@@ -8,19 +8,24 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "cyclic8"
 
-function build_system(K)
-    _, (x1, x2, x3, x4, x5, x6, x7, x8) = polynomial_ring(K, ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
-    return [
-        x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
-        x1*x2 + x1*x8 + x2*x3 + x3*x4 + x4*x5 + x5*x6 + x6*x7 + x7*x8,
-        x1*x2*x3 + x1*x2*x8 + x1*x7*x8 + x2*x3*x4 + x3*x4*x5 + x4*x5*x6 + x5*x6*x7 + x6*x7*x8,
-        x1*x2*x3*x4 + x1*x2*x3*x8 + x1*x2*x7*x8 + x1*x6*x7*x8 + x2*x3*x4*x5 + x3*x4*x5*x6 + x4*x5*x6*x7 + x5*x6*x7*x8,
-        x1*x2*x3*x4*x5 + x1*x2*x3*x4*x8 + x1*x2*x3*x7*x8 + x1*x2*x6*x7*x8 + x1*x5*x6*x7*x8 + x2*x3*x4*x5*x6 + x3*x4*x5*x6*x7 + x4*x5*x6*x7*x8,
-        x1*x2*x3*x4*x5*x6 + x1*x2*x3*x4*x5*x8 + x1*x2*x3*x4*x7*x8 + x1*x2*x3*x6*x7*x8 + x1*x2*x5*x6*x7*x8 + x1*x4*x5*x6*x7*x8 + x2*x3*x4*x5*x6*x7 + x3*x4*x5*x6*x7*x8,
-        x1*x2*x3*x4*x5*x6*x7 + x1*x2*x3*x4*x5*x6*x8 + x1*x2*x3*x4*x5*x7*x8 + x1*x2*x3*x4*x6*x7*x8 + x1*x2*x3*x5*x6*x7*x8 + x1*x2*x4*x5*x6*x7*x8 + x1*x3*x4*x5*x6*x7*x8 + x2*x3*x4*x5*x6*x7*x8,
-        x1*x2*x3*x4*x5*x6*x7*x8 - 1
-    ]
-end
+R, (x1, x2, x3, x4, x5, x6, x7, x8) = polynomial_ring(QQ, ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
+
+F = [
+    x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
+    x1*x2 + x1*x8 + x2*x3 + x3*x4 + x4*x5 + x5*x6 + x6*x7 + x7*x8,
+    x1*x2*x3 + x1*x2*x8 + x1*x7*x8 + x2*x3*x4 + x3*x4*x5 + x4*x5*x6 + x5*x6*x7 + x6*x7*x8,
+    x1*x2*x3*x4 + x1*x2*x3*x8 + x1*x2*x7*x8 + x1*x6*x7*x8 + x2*x3*x4*x5 + x3*x4*x5*x6 + x4*x5*x6*x7 + x5*x6*x7*x8,
+    x1*x2*x3*x4*x5 + x1*x2*x3*x4*x8 + x1*x2*x3*x7*x8 + x1*x2*x6*x7*x8 + x1*x5*x6*x7*x8 + x2*x3*x4*x5*x6 + x3*x4*x5*x6*x7 + x4*x5*x6*x7*x8,
+    x1*x2*x3*x4*x5*x6 + x1*x2*x3*x4*x5*x8 + x1*x2*x3*x4*x7*x8 + x1*x2*x3*x6*x7*x8 + x1*x2*x5*x6*x7*x8 + x1*x4*x5*x6*x7*x8 + x2*x3*x4*x5*x6*x7 + x3*x4*x5*x6*x7*x8,
+    x1*x2*x3*x4*x5*x6*x7 + x1*x2*x3*x4*x5*x6*x8 + x1*x2*x3*x4*x5*x7*x8 + x1*x2*x3*x4*x6*x7*x8 + x1*x2*x3*x5*x6*x7*x8 + x1*x2*x4*x5*x6*x7*x8 + x1*x3*x4*x5*x6*x7*x8 + x2*x3*x4*x5*x6*x7*x8,
+    x1*x2*x3*x4*x5*x6*x7*x8 - 1
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -31,7 +36,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -39,17 +43,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

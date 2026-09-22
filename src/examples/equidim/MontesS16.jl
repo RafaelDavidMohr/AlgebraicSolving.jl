@@ -8,27 +8,32 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "MontesS16"
 
-function build_system(K)
-    _, (w12, w13, w14, w15, w23, w25, w34, w45, w26, w36, w46, w56, x, y, z) = polynomial_ring(K, ["w12", "w13", "w14", "w15", "w23", "w25", "w34", "w45", "w26", "w36", "w46", "w56", "x", "y", "z"])
-    return [
-        w12 + w14,
-        w12 + w13,
-        w12 + w15,
-        w12 + w23 + w25 - w26*x + w26,
-        w12 + w25 - w26*y + w26,
-        w12 + w23 - w26*z + w26,
-        w23 + w34 + w36*x,
-        w13 + w34 - w36*y + w36,
-        w23 + w36*z,
-        w14 + w34 + w45 - w46*x + w46,
-        w34 + w46*y,
-        w45 + w56*z,
-        w15 + w45 - w56*z + w56,
-        w26*x - w26 + w36*x + w46*x - w46 + w56*x,
-        w26*y - w26 + w36*y - w36 + w46*y + w56*y,
-        w26*z - w26 + w36*z + w46*z + w56*z - w56
-    ]
-end
+R, (w12, w13, w14, w15, w23, w25, w34, w45, w26, w36, w46, w56, x, y, z) = polynomial_ring(QQ, ["w12", "w13", "w14", "w15", "w23", "w25", "w34", "w45", "w26", "w36", "w46", "w56", "x", "y", "z"])
+
+F = [
+    w12 + w14,
+    w12 + w13,
+    w12 + w15,
+    w12 + w23 + w25 - w26*x + w26,
+    w12 + w25 - w26*y + w26,
+    w12 + w23 - w26*z + w26,
+    w23 + w34 + w36*x,
+    w13 + w34 - w36*y + w36,
+    w23 + w36*z,
+    w14 + w34 + w45 - w46*x + w46,
+    w34 + w46*y,
+    w45 + w56*z,
+    w15 + w45 - w56*z + w56,
+    w26*x - w26 + w36*x + w46*x - w46 + w56*x,
+    w26*y - w26 + w36*y - w36 + w46*y + w56*y,
+    w26*z - w26 + w36*z + w46*z + w56*z - w56
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["w12", "w13", "w14", "w15", "w23", "w25", "w34", "w45", "w26", "w36", "w46", "w56", "x", "y", "z"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -39,7 +44,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -47,17 +51,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf

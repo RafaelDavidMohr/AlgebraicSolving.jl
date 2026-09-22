@@ -8,15 +8,20 @@ using FileWatching.Pidfile: mkpidlock
 
 const NAME = "jorge2"
 
-function build_system(K)
-    _, (x, y, z) = polynomial_ring(K, ["x", "y", "z"])
-    return [
-        73960*x^3 + 46428*x^2*y - 320426*x^2*z - 210018*x^2 - 88867*x*y^2 - 163934*x*y*z + 721747*x*y - 184389*x*z^2 + 416981*x*z - 111106*x - 62940*y^3 + 356381*y^2*z + 146898*y^2 + 32282*y*z^2 + 118097*y*z - 377082*y - 27183*z^3 + 116973*z^2 - 153504*z + 56580,
-        3038*x^2*y - 3686*x^2*z + 2288*x*y^2 - 16544*x*y*z - 27166*x*y - 3344*x*z^2 + 4168*x*z + 315*y^3 + 4111*y^2*z - 2769*y^2 + 157*y*z^2 + 13942*y*z + 25806*y - 663*z^3 + 1527*z^2 - 690*z,
-        650*x^2*y + 3350*x^2*z + 195*x*y^2 - 8450*x*y*z + 13390*x*y + 845*x*z^2 - 1630*x*z - 260*y^3 - 3410*y^2*z - 276*y^2 - 390*y*z^2 + 8372*y*z - 15088*y,
-        -225*x^2*y + 1685*x^2*z - 705*x*y^2 - 450*x*y*z + 8056*x*y + 345*x*z^2 - 705*x*z - 420*y^3 + 1325*y^2*z + 918*y^2 + 645*y*z^2 + 1527*y*z - 5658*y
-    ]
-end
+R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"])
+
+F = [
+    73960*x^3 + 46428*x^2*y - 320426*x^2*z - 210018*x^2 - 88867*x*y^2 - 163934*x*y*z + 721747*x*y - 184389*x*z^2 + 416981*x*z - 111106*x - 62940*y^3 + 356381*y^2*z + 146898*y^2 + 32282*y*z^2 + 118097*y*z - 377082*y - 27183*z^3 + 116973*z^2 - 153504*z + 56580,
+    3038*x^2*y - 3686*x^2*z + 2288*x*y^2 - 16544*x*y*z - 27166*x*y - 3344*x*z^2 + 4168*x*z + 315*y^3 + 4111*y^2*z - 2769*y^2 + 157*y*z^2 + 13942*y*z + 25806*y - 663*z^3 + 1527*z^2 - 690*z,
+    650*x^2*y + 3350*x^2*z + 195*x*y^2 - 8450*x*y*z + 13390*x*y + 845*x*z^2 - 1630*x*z - 260*y^3 - 3410*y^2*z - 276*y^2 - 390*y*z^2 + 8372*y*z - 15088*y,
+    -225*x^2*y + 1685*x^2*z - 705*x*y^2 - 450*x*y*z + 8056*x*y + 345*x*z^2 - 705*x*z - 420*y^3 + 1325*y^2*z + 918*y^2 + 645*y*z^2 + 1527*y*z - 5658*y
+]
+
+# Reducing the rational system is far cheaper than building the same
+# polynomials again over the prime field.
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+Rp, _ = polynomial_ring(GF(prime), ["x", "y", "z"])
+Fp = [AlgebraicSolving.reduce_mod_p(f, Rp) for f in F]
 
 # Decompose a tiny system first so that the timings below measure the
 # computation rather than compilation. The solver specialises on the number of
@@ -27,7 +32,6 @@ function warmup(K)
     return nothing
 end
 
-prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
 warmup(QQ)
 warmup(GF(prime))
 
@@ -35,17 +39,17 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(F), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(Fp), info_level = 1)
 end
 
 ratio = time_qq / time_gf
