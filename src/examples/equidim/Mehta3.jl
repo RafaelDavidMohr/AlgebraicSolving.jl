@@ -1,0 +1,59 @@
+# Benchmark for `equidimensional_decomposition` on the "Mehta3" system.
+
+using Pkg
+Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
+
+using AlgebraicSolving
+
+const NAME = "Mehta3"
+
+function build_system(K)
+    _, (x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, a, b, g) = polynomial_ring(K, ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4", "x5", "y5", "a", "b", "g"])
+    return [
+        x1 - y1*b + a,
+        x2 - y2*b + a,
+        x3 - y3*b + a,
+        x4 - y4*b + a,
+        x5 - y5*b + a,
+        -x1^3 + 12*x1*g + 3*x1 - 3*y1 - 3*x2*g - 3*x3*g - 3*x4*g - 3*x5*g,
+        -3*x1*g - x2^3 + 12*x2*g + 3*x2 - 3*y2 - 3*x3*g - 3*x4*g - 3*x5*g,
+        -3*x1*g - 3*x2*g - x3^3 + 12*x3*g + 3*x3 - 3*y3 - 3*x4*g - 3*x5*g,
+        -3*x1*g - 3*x2*g - 3*x3*g - x4^3 + 12*x4*g + 3*x4 - 3*y4 - 3*x5*g,
+        -3*x1*g - 3*x2*g - 3*x3*g - 3*x4*g - x5^3 + 12*x5*g + 3*x5 - 3*y5
+    ]
+end
+
+# Decompose a tiny system first so that the timings below measure the
+# computation rather than compilation. The solver specialises on the number of
+# variables, so the warm up uses as many of them as the benchmark itself.
+function warmup(K)
+    _, w = polynomial_ring(K, ["w$(i)" for i in 1:13])
+    equidimensional_decomposition(Ideal([w[1]*w[2], w[1]*w[3], w[2]*w[3]]))
+    return nothing
+end
+
+prime = Int32(AlgebraicSolving.Nemo.rand_bits_prime(ZZ, 31))
+warmup(QQ)
+warmup(GF(prime))
+
+# A short first run can still be dominated by one off compilation that the warm
+# up does not cover, so measure a second one and keep that timing. Past this
+# threshold the computation dwarfs the overhead and the first timing stands.
+println("### $(NAME): equidimensional_decomposition over QQ ###")
+time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 2)
+if time_qq < 120
+    println("### $(NAME): second run over QQ ###")
+    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 2)
+end
+
+println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
+time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 2)
+if time_gf < 120
+    println("### $(NAME): second run over GF($(prime)) ###")
+    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 2)
+end
+
+println()
+println("### $(NAME) timings ###")
+println("QQ:          $(time_qq) s")
+println("GF($(prime)): $(time_gf) s")
