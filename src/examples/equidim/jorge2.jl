@@ -4,6 +4,7 @@ using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using AlgebraicSolving
+using FileWatching.Pidfile: mkpidlock
 
 const NAME = "jorge2"
 
@@ -34,20 +35,39 @@ warmup(GF(prime))
 # up does not cover, so measure a second one and keep that timing. Past this
 # threshold the computation dwarfs the overhead and the first timing stands.
 println("### $(NAME): equidimensional_decomposition over QQ ###")
-time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 2)
+time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
 if time_qq < 120
     println("### $(NAME): second run over QQ ###")
-    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 2)
+    time_qq = @elapsed equidimensional_decomposition(Ideal(build_system(QQ)), info_level = 1)
 end
 
 println("### $(NAME): equidimensional_decomposition over GF($(prime)) ###")
-time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 2)
+time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
 if time_gf < 120
     println("### $(NAME): second run over GF($(prime)) ###")
-    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 2)
+    time_gf = @elapsed equidimensional_decomposition(Ideal(build_system(GF(prime))), info_level = 1)
 end
+
+ratio = time_qq / time_gf
 
 println()
 println("### $(NAME) timings ###")
 println("QQ:          $(time_qq) s")
 println("GF($(prime)): $(time_gf) s")
+println("QQ / GF:     $(ratio)")
+
+# Collect the timings of every benchmark in this folder in one table. Rows are
+# appended, so re-running a benchmark adds a row rather than replacing one.
+# Concurrent runs would otherwise lose and interleave rows, hence the lock.
+csv = joinpath(@__DIR__, "timings.csv")
+mkpidlock(csv * ".lock") do
+    write_header = !isfile(csv)
+    open(csv, "a") do io
+        write_header && println(io, "system,nvars,neqns,time_qq,time_gf,ratio_qq_gf")
+        println(io, join((NAME, 3, 4,
+                          round(time_qq, digits = 6),
+                          round(time_gf, digits = 6),
+                          round(ratio, digits = 4)), ","))
+    end
+end
+println("appended to $(csv)")
