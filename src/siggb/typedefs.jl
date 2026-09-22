@@ -186,11 +186,11 @@ struct NoTracerMatrix <: TracerMatrix end
 
 # struct to remember the row reductions we did
 mutable struct SigTracerMatrix
-    # first index row index, second one rewr ind
+    # first index row index, second index constituting basis index
     rows::Dict{Sig, Tuple{Int, Int}}
-    # if row i has been added to basis
-    is_basis_row::Dict{Int, Int}
-    row_ind_to_sig::Dict{Int, Sig}
+    # first index row index, second index basis index where new element is stored
+    is_basis_row::Dict{Int, Int} 
+    row_ind_to_sig::Dict{Int, Sig} # row signatures
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
