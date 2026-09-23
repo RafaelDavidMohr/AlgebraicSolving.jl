@@ -298,24 +298,41 @@ function sig_decomp!(basis::Basis{N},
             @info "------------------------------------------"
             continue
         end
+        # The components are visited in the same order for every good prime, so
+        # the tracer recorded for this component in the first modular run is the
+        # one we replay here.
+        ts = r.tracers
+        if is_replaying(ts)
+            tr, replay_rng = replay_component(ts)
+        else
+            replay_rng = 1:0
+            tr_start = length(tr.mats) + 1
+        end
+
         found_zd, isempt, zd_coeffs,
         zd_mons, zd_ind = siggb_for_split!(bs, ps,
                                            tgs, ind_ord,
                                            basis_ht, tr,
                                            syz_queue,
                                            char, shift, lc_set,
-                                           timer)
+                                           timer, replay_rng)
+
+        if is_replaying(ts)
+            finish_replay!(ts)
+        else
+            record_component!(ts, tr, tr_start)
+        end
         if found_zd
             @info "splitting component"
             tim = @elapsed lc_set_hull, bs2, ps2, tgs2,
-                           ind_ord2, lc_set_nz, tr2 = split!(bs, basis_ht,
+                           ind_ord2, lc_set_nz, tr2, tr_hull = split!(bs, basis_ht,
                                                              zd_mons, zd_coeffs,
                                                              tr, ps,
                                                              zd_ind, tgs,
                                                              ind_ord,
                                                              lc_set, r)
             timer.comp_lc_time += tim
-            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr))
+            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr_hull))
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
         else
             @info "finished component"
@@ -336,7 +353,8 @@ function siggb_for_split!(basis::Basis{N},
                           char::Coeff,
                           shift::Cbuf,
                           lc_set::LocClosedSet,
-                          timer::Timings) where N
+                          timer::Timings,
+                          replay::UnitRange{Int} = 1:0) where N
 
     splitting_inds = [index(basis.sigs[i]) for i in 1:basis.input_load]
     filter!(ind -> gettag(tags, ind) == :split, splitting_inds)
@@ -356,25 +374,45 @@ function siggb_for_split!(basis::Basis{N},
         end
     end
 
-    while !iszero(pairset.load)
-        # find minimum pair index
-        min_pair_idx = minimum(pair -> ind_order.ord[index(pair.top_sig)],
-                               pairset.elems[1:pairset.load])
+    # When replaying we rebuild every matrix straight from the tracer, which
+    # skips select_normal!/symbolic_pp! and with them all pair handling, so the
+    # recorded matrix indices rather than the pairset drive the loop.
+    replaying = !isempty(replay)
+    mat_idx = first(replay)
 
-	matrix = initialize_matrix(Val(N))
-        symbol_ht = initialize_secondary_hash_table(basis_ht)
+    while true
+        local deg::Exp
+        if replaying
+            mat_idx > last(replay) && break
+            symbol_ht = initialize_secondary_hash_table(basis_ht)
+            tr.curr_mat = mat_idx
+            tim = @elapsed matrix = construct_matrix!(tr, basis, symbol_ht,
+                                                      basis_ht, ind_order, mat_idx)
+            timer.sym_pp_time += tim
+            deg = tr.mats[mat_idx].deg
+            mat_idx += 1
+        else
+            iszero(pairset.load) && break
 
-        tim = @elapsed deg, _ = select_normal!(pairset, basis, matrix,
-                                               basis_ht, symbol_ht, ind_order, tags)
-        timer.select_time += tim
-        tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
-                                    ind_order, tags)
-        timer.sym_pp_time += tim
+	    matrix = initialize_matrix(Val(N))
+            symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        finalize_matrix!(matrix, symbol_ht, ind_order)
-        iszero(matrix.nrows) && continue
+            tim = @elapsed deg, _ = select_normal!(pairset, basis, matrix,
+                                                   basis_ht, symbol_ht, ind_order, tags)
+            timer.select_time += tim
+            tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
+                                        ind_order, tags)
+            timer.sym_pp_time += tim
+
+            finalize_matrix!(matrix, symbol_ht, ind_order)
+            iszero(matrix.nrows) && continue
+        end
+
         tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift, tr)
         timer.lin_alg_time += tim
+
+        # remember the degree, it is not recoverable without select_normal!
+        !replaying && (last(tr.mats).deg = deg)
 
         time = @elapsed update_siggb!(timer, basis, matrix, pairset,
                                       symbol_ht, basis_ht,
@@ -404,7 +442,7 @@ function siggb_for_split!(basis::Basis{N},
             end
         end
 
-        sort_pairset!(pairset, 1, pairset.load-1, :DPOT, ind_order)
+        !replaying && sort_pairset!(pairset, 1, pairset.load-1, :DPOT, ind_order)
     end
     if !isempty(syz_queue)
         sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
@@ -462,8 +500,11 @@ function split!(basis::Basis{N},
             ord_ind, _ = findmin((i -> ind_order.ord[i]).(ge_deg_inds))
         end
 
-        # insert zd in system
-        s_ind = add_new_sequence_element!(basis, basis_ht, tr,
+        # insert zd in system. The hull carries on with a shifted copy so that
+        # the matrices recorded before this split keep the basis indices they
+        # were recorded with and stay replayable.
+        tr_hull = copy_tracer(tr)
+        s_ind = add_new_sequence_element!(basis, basis_ht, tr_hull,
                                           cofac_coeffs, cofac_mons_hsh,
                                           ind_order, ord_ind, pairset,
                                           tags, new_tg = :split)
@@ -477,7 +518,7 @@ function split!(basis::Basis{N},
         lc_set_nz.codim_upper_bound = new_codim_ub
     end
 
-    return lc_set_hull, basis2, ps2, tags2, ind_ord2, lc_set_nz, tr2
+    return lc_set_hull, basis2, ps2, tags2, ind_ord2, lc_set_nz, tr2, tr_hull
 end    
 
 function process_syz_for_split!(syz_queue::Vector{SyzInfo},

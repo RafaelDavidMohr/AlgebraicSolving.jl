@@ -15,6 +15,11 @@ function echelonize!(matrix::MacaulayMatrix,
 
     tr_mat = new_tr_mat(matrix.nrows, tr)
 
+    # record the pivot marks before any of them get overwritten below
+    if !is_complete(tr) && tr isa SigTracer
+        tr_mat.pivots = copy(matrix.pivots[1:matrix.ncols])
+    end
+
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
         row_ind = matrix.sig_order[i]
@@ -27,14 +32,17 @@ function echelonize!(matrix::MacaulayMatrix,
     @inbounds for i in 1:matrix.nrows
         row_ind = matrix.sig_order[i]
 
-        # store tracer data
         row_sig = matrix.sigs[row_ind]
-        !is_complete(tr) && add_row!(tr_mat, row_sig, row_ind,
-                                     matrix.parent_inds[row_ind])
 
         does_red = false
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
+
+        # store tracer data. The row operations depend on the prime, so they are
+        # recorded on every run even when the structure is being replayed.
+        add_row!(tr_mat, row_sig, row_ind, matrix.parent_inds[row_ind],
+                 pivots[l_col_idx] == row_ind)
+
         if pivots[l_col_idx] == row_ind
             continue
         # check if the row can be top reduced
@@ -73,7 +81,7 @@ function echelonize!(matrix::MacaulayMatrix,
                 continue
             end
 
-            !is_complete(tr) && store_row_op!(tr_mat, row_ind, pividx, a)
+            store_row_op!(tr_mat, row_ind, pividx, a)
 
             # subtract a*rows[pivots[j]] from buffer
             pivmons = matrix.rows[pividx]
@@ -109,7 +117,7 @@ function echelonize!(matrix::MacaulayMatrix,
             j += 1
         end
         # store that we normalized the row
-        !is_complete(tr) && store_inver!(tr_mat, row_ind, inver)
+        store_inver!(tr_mat, row_ind, inver)
 
         # check if row lead reduced
         @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1])
@@ -125,6 +133,19 @@ function echelonize!(matrix::MacaulayMatrix,
     end
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
+    end
+
+    # Which rows become basis elements is a property of the computation, not of
+    # the prime, so it is recorded once and replayed afterwards. Rows that are
+    # never reduced leave the loop above early and would otherwise be missed.
+    if is_complete(tr)
+        @inbounds for (k, row_ind) in enumerate(tr_mat.toadd)
+            matrix.toadd[k] = row_ind
+        end
+        matrix.toadd_length = length(tr_mat.toadd)
+    elseif tr isa SigTracer
+        resize!(tr_mat.toadd, matrix.toadd_length)
+        @inbounds copyto!(tr_mat.toadd, matrix.toadd[1:matrix.toadd_length])
     end
 
     return arit_ops

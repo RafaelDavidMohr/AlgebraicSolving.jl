@@ -6,7 +6,7 @@ function new_tracer()
     syz_ind_to_mat = Int[]
     return SigTracer(mats, basis_ind_to_mat,
                      syz_ind_to_mat, 0,
-                     init_basis_size, false)
+                     init_basis_size, false, 0)
 end
 
 is_complete(tr::SigTracer) = tr.is_complete
@@ -14,14 +14,22 @@ is_complete(tr::SigTracer) = tr.is_complete
 function new_tr_mat(nrows::Int,
                     tr::SigTracer)
 
+    # when replaying we hand back the recorded matrix the caller is working on
+    # instead of appending to what we are reading
+    is_complete(tr) && return tr.mats[tr.curr_mat]
+
     diag = Vector{Coeff}(undef, nrows)
     mat_data = Vector{Vector{Tuple{Int, Coeff}}}(undef, nrows)
 
-    res = SigTracerMatrix(Dict{Sig, Tuple{Int, Int, Bool}}(),
+    res = SigTracerMatrix(Vector{Tuple{Sig, Int, Bool}}(undef, nrows),
+                          Dict{Sig, Int}(),
                           Dict{Int, Int}(),
                           Dict{Int, Sig}(),
                           diag,
-                          mat_data)
+                          mat_data,
+                          zero(Exp),
+                          Int[],
+                          Int[])
     push!(tr.mats, res)
     return res
 end
@@ -29,9 +37,11 @@ end
 function add_row!(tr_mat::SigTracerMatrix,
                   sig::Sig,
                   row_ind::Int,
-                  parent_ind::Int)
+                  parent_ind::Int,
+                  is_pivot::Bool)
 
-    tr_mat.rows[sig] = (row_ind, parent_ind)
+    tr_mat.rows[row_ind] = (sig, parent_ind, is_pivot)
+    tr_mat.sig_to_row[sig] = row_ind
 
     # allocate a row for the tracer matrix
     # at most we subtract (i-1) other rows
@@ -53,7 +63,6 @@ function store_inver!(tr_mat::SigTracerMatrix,
                       row_ind::Int,
                       inver::Coeff)
 
-    is_complete(tr) && return
     tr_mat.diagonal[row_ind] = inver
 end
 
@@ -69,19 +78,48 @@ function store_basis_elem!(tr::SigTracer,
         resize!(tr.basis_ind_to_mat, tr.size)
     end
     tr_mat = last(tr.mats)
-    @inbounds row_ind, _ = tr_mat.rows[new_sig]
+    @inbounds row_ind = tr_mat.sig_to_row[new_sig]
     @inbounds tr_mat.is_basis_row[row_ind] = bas_ind
     @inbounds tr.basis_ind_to_mat[bas_ind] = length(tr.mats)
 end
 
 function store_syz!(tr::SigTracer)
 
+    is_complete(tr) && return
     push!(tr.syz_ind_to_mat, length(tr.mats)) 
+end
+
+# A split hands each of its two components its own tracer, so that the matrices
+# recorded before the split keep the basis indices they were recorded with. The
+# hull continues on a shifted copy, the nonzero component starts from scratch.
+#
+# Only the structure is copied. The coefficients stay shared with the parent:
+# they belong to the prime currently being worked on and are re-recorded by
+# echelonize!, and a component only ever replays its own matrices, so an
+# inherited matrix is refreshed through whichever tracer does replay it.
+function copy_tracer(tr::SigTracer)
+    mats = Vector{SigTracerMatrix}(undef, length(tr.mats))
+    @inbounds for (i, m) in enumerate(tr.mats)
+        mats[i] = SigTracerMatrix(copy(m.rows),
+                                  copy(m.sig_to_row),
+                                  copy(m.is_basis_row),
+                                  copy(m.row_ind_to_sig),
+                                  m.diagonal,
+                                  m.col_inds_and_coeffs,
+                                  m.deg,
+                                  copy(m.toadd),
+                                  copy(m.pivots))
+    end
+    return SigTracer(mats, copy(tr.basis_ind_to_mat), copy(tr.syz_ind_to_mat),
+                     tr.load, tr.size, tr.is_complete, tr.curr_mat)
 end
 
 function shift_tracer!(tr::SigTracer, shift::Int,
                        old_offset::Int,
                        basis::Basis)
+
+    # a recorded tracer already carries the shifted indices
+    is_complete(tr) && return
 
     if tr.size != basis.basis_size
         tr.size = basis.basis_size
@@ -92,10 +130,10 @@ function shift_tracer!(tr::SigTracer, shift::Int,
     end
 
     for mat in tr.mats
-        for i in keys(mat.rows)
+        for i in eachindex(mat.rows)
             v = mat.rows[i]
             if v[2] >= old_offset
-                mat.rows[i] = (v[1], v[2] + shift)
+                mat.rows[i] = (v[1], v[2] + shift, v[3])
             end
         end
         for (i, v) in pairs(mat.is_basis_row)
@@ -105,6 +143,42 @@ function shift_tracer!(tr::SigTracer, shift::Int,
         end
     end
 end                
+
+# Tracer store, see the comment on TracerStore in typedefs.jl
+
+reset_tracers!(ts::TracerStore) = ts.ind = 1
+
+is_replaying(ts::TracerStore) = ts.recorded
+
+replay_component(ts::TracerStore) = ts.tracers[ts.ind], ts.ranges[ts.ind]
+
+finish_replay!(ts::TracerStore) = ts.ind += 1
+
+function record_component!(ts::TracerStore, tr::SigTracer, start::Int)
+    push!(ts.tracers, tr)
+    push!(ts.ranges, start:length(tr.mats))
+    ts.ind += 1
+    return nothing
+end
+
+# After the first modular run the structure of every recorded tracer is read
+# only. The coefficients are not structure: they belong to the prime they were
+# computed with and are re-recorded on every later run, so they are dropped here
+# rather than left around to be picked up by mistake.
+function mark_recorded!(ts::TracerStore)
+    ts.recorded && return nothing
+    for tr in ts.tracers
+        tr.is_complete = true
+        for m in tr.mats
+            fill!(m.diagonal, one(Coeff))
+            for i in eachindex(m.col_inds_and_coeffs)
+                isassigned(m.col_inds_and_coeffs, i) && empty!(m.col_inds_and_coeffs[i])
+            end
+        end
+    end
+    ts.recorded = true
+    return nothing
+end
 
 function construct_matrix!(tr::SigTracer,
                            basis::Basis{N},
@@ -116,11 +190,25 @@ function construct_matrix!(tr::SigTracer,
     tr_mat = tr.mats[index]
     nrows = length(tr_mat.rows)
     mat = initialize_matrix(Val(N), nrows)
-    @inbounds for (sig, (_, basis_index)) in tr_mat.rows
-        mult = div(monomial(sig), monomial(basis.sigs[basis_index]))
-        write_to_matrix_row!(mat, basis, basis_index, symbol_ht, ht, mult, sig)
+    @inbounds for i in 1:nrows
+        mat.pivots[i] = 0
     end
+    # rebuild the rows in their recorded memory order
+    @inbounds for row_ind in 1:nrows
+        sig, basis_index, is_pivot = tr_mat.rows[row_ind]
+        mult = divide(monomial(sig), monomial(basis.sigs[basis_index]))
+        lead = write_to_matrix_row!(mat, basis, basis_index, symbol_ht, ht, mult,
+                                    sig, row_ind)
+        # restore the pivot marks symbolic_pp! would have set
+        resize_pivots!(mat, symbol_ht)
+        is_pivot && (mat.pivots[lead] = row_ind)
+    end
+    mat.nrows = nrows
+    # symbolic_pp! would normally have grown the pivots along with the columns
+    resize_pivots!(mat, symbol_ht)
     finalize_matrix!(mat, symbol_ht, ind_order)
+    # put back the pivot marks exactly as they stood in the recorded run
+    @inbounds copyto!(mat.pivots, 1, tr_mat.pivots, 1, length(tr_mat.pivots))
     return mat
 end
 
@@ -136,7 +224,8 @@ end
 function add_row!(tr_mat::NoTracerMatrix,
                   sig::Sig,
                   row_ind::Int,
-                  parent_ind::Int)
+                  parent_ind::Int,
+                  is_pivot::Bool)
 
     return
 end
@@ -168,6 +257,8 @@ function store_syz!(tr::NoTracer)
 
     return
 end
+
+copy_tracer(tr::NoTracer) = tr
 
 function shift_tracer!(tr::NoTracer, shift::Int,
                        old_offset::Int,

@@ -77,7 +77,8 @@ function construct_module(sig::Sig{N},
 
     tr_mat = tr.mats[mat_index]
 
-    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+    row_ind = tr_mat.sig_to_row[sig]
+    rewr_basis_ind = tr_mat.rows[row_ind][2]
 
     basis_ind = get(tr_mat.is_basis_row, row_ind, 0)
     if !iszero(basis_ind)
@@ -105,7 +106,8 @@ function construct_module_core(sig::Sig{N},
 
     tr_mat = tr.mats[mat_index]
 
-    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+    row_ind = tr_mat.sig_to_row[sig]
+    rewr_basis_ind = tr_mat.rows[row_ind][2]
 
     # construct module representation of canonical rewriter
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,

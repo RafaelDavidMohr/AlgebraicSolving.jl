@@ -186,13 +186,33 @@ struct NoTracerMatrix <: TracerMatrix end
 
 # struct to remember the row reductions we did
 mutable struct SigTracerMatrix
-    # first index row index, second index constituting basis index
-    rows::Dict{Sig, Tuple{Int, Int}}
+    # Row data indexed by the row's position in memory, so that replaying a
+    # tracer puts every row back where it was. This has to be ordered: the row
+    # indices in `col_inds_and_coeffs`, `is_basis_row` and `toadd` all refer to
+    # these positions, and a Dict would hand the rows back in an arbitrary
+    # order. Each entry is the row's signature, the basis index it came from,
+    # and whether symbolic_pp! had already marked it as a pivot, i.e. it is a
+    # reducer rather than a row to be reduced. That flag matters when replaying
+    # because echelonize! skips pivot rows before reaching the `toadd` check.
+    rows::Vector{Tuple{Sig, Int, Bool}}
+    # signature to row index, for the lookups that go the other way
+    sig_to_row::Dict{Sig, Int}
     # first index row index, second index basis index where new element is stored
-    is_basis_row::Dict{Int, Int} 
+    is_basis_row::Dict{Int, Int}
     row_ind_to_sig::Dict{Int, Sig} # row signatures
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
+    # degree selected for this matrix, needed when replaying a tracer because
+    # the degree normally comes out of select_normal!
+    deg::Exp
+    # rows that went into the basis. Replaying reuses this rather than redoing
+    # the lead reduction check, which only sees rows that were actually reduced.
+    toadd::Vector{Int}
+    # the pivot marks symbolic_pp! left, as they stand when echelonize! starts.
+    # They cannot be rebuilt from a per row flag because echelonize! overwrites
+    # pivots while it reduces, so a mark can be gone by the time its row is
+    # reached.
+    pivots::Vector{Int}
 end
 
 abstract type Tracer end
@@ -206,6 +226,8 @@ mutable struct SigTracer <: Tracer
     load::Int
     size::Int
     is_complete::Bool # this is `true` if data from a complete sigGB run is stored
+    # index into `mats` that is being replayed, only meaningful once complete
+    curr_mat::Int
 end
 
 # For Index ordering
@@ -266,6 +288,23 @@ end
 
 RandCoeffs() = RandCoeffs(Int[], 1)
 
+# Tracers of the components visited by sig_decomp!, one entry per component, in
+# the order in which the components are processed. The first modular run records
+# them, every later one replays them to skip select_normal!/symbolic_pp!. This
+# is well defined because a good prime splits in exactly the same way, the same
+# assumption that lets the registry match up polynomials across primes.
+# `ranges` says which of a tracer's matrices belong to which component: a hull
+# component keeps growing its parent's tracer, so one tracer can back several
+# entries here.
+mutable struct TracerStore
+    tracers::Vector{SigTracer}
+    ranges::Vector{UnitRange{Int}}
+    ind::Int
+    recorded::Bool
+end
+
+TracerStore() = TracerStore(SigTracer[], UnitRange{Int}[], 1, false)
+
 mutable struct ReconstructRegistry <: Registry
     R::QQMPolyRing
     pols::Vector{ReconstructPol}
@@ -275,20 +314,22 @@ mutable struct ReconstructRegistry <: Registry
     pprod::ZZRingElem
     n_unstable::Int
     rand_coeffs::RandCoeffs
+    tracers::TracerStore
 end
 
 ReconstructRegistry(R::QQMPolyRing, pols::Vector{ReconstructPol}, curr_ind::Int,
                     primes::AbstractVector, current_prime) =
     ReconstructRegistry(R, pols, curr_ind, ZZRingElem.(primes), ZZRingElem(current_prime),
-                        one(ZZ), 0, RandCoeffs())
+                        one(ZZ), 0, RandCoeffs(), TracerStore())
 
 mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
     pols::Vector{T}
     rand_coeffs::RandCoeffs
+    tracers::TracerStore
 end
 
 ModularRegistry(pols::Vector{T}) where {T <: MPolyRingElem} =
-    ModularRegistry{T}(pols, RandCoeffs())
+    ModularRegistry{T}(pols, RandCoeffs(), TracerStore())
 
 # for user level output of equidimensional decomposition
 mutable struct LocallyClosedSet{T <: MPolyRingElem}

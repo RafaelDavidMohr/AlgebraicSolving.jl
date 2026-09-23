@@ -182,10 +182,10 @@ function garbage_collect!(basis::Basis{N},
     
     @inbounds if typeof(tr) == SigTracer
         for mat in tr.mats
-            for sig in keys(mat.rows)
-                row_ind, rewr_ind = mat.rows[sig]
+            for row_ind in eachindex(mat.rows)
+                sg, rewr_ind, is_piv = mat.rows[row_ind]
                 shc = compute_shift(rewr_ind, del_indices)
-                mat.rows[sig] = (row_ind, shc != -1 ? rewr_ind-shc : 0)
+                mat.rows[row_ind] = (sg, shc != -1 ? rewr_ind-shc : 0, is_piv)
             end
             for r_ind in keys(mat.is_basis_row)
                 b_ind = mat.is_basis_row[r_ind]
