@@ -28,8 +28,7 @@ function new_tr_mat(nrows::Int,
                           diag,
                           mat_data,
                           zero(Exp),
-                          Int[],
-                          Int[])
+                          Int[],)
     push!(tr.mats, res)
     return res
 end
@@ -89,14 +88,7 @@ function store_syz!(tr::SigTracer)
     push!(tr.syz_ind_to_mat, length(tr.mats)) 
 end
 
-# A split hands each of its two components its own tracer, so that the matrices
-# recorded before the split keep the basis indices they were recorded with. The
-# hull continues on a shifted copy, the nonzero component starts from scratch.
-#
-# Only the structure is copied. The coefficients stay shared with the parent:
-# they belong to the prime currently being worked on and are re-recorded by
-# echelonize!, and a component only ever replays its own matrices, so an
-# inherited matrix is refreshed through whichever tracer does replay it.
+# Only the structure is copied. The coefficients stay shared with the parent.
 function copy_tracer(tr::SigTracer)
     mats = Vector{SigTracerMatrix}(undef, length(tr.mats))
     @inbounds for (i, m) in enumerate(tr.mats)
@@ -107,8 +99,7 @@ function copy_tracer(tr::SigTracer)
                                   m.diagonal,
                                   m.col_inds_and_coeffs,
                                   m.deg,
-                                  copy(m.toadd),
-                                  copy(m.pivots))
+                                  copy(m.toadd))
     end
     return SigTracer(mats, copy(tr.basis_ind_to_mat), copy(tr.syz_ind_to_mat),
                      tr.load, tr.size, tr.is_complete, tr.curr_mat)
@@ -144,8 +135,6 @@ function shift_tracer!(tr::SigTracer, shift::Int,
     end
 end                
 
-# Tracer store, see the comment on TracerStore in typedefs.jl
-
 reset_tracers!(ts::TracerStore) = ts.ind = 1
 
 is_replaying(ts::TracerStore) = ts.recorded
@@ -161,10 +150,6 @@ function record_component!(ts::TracerStore, tr::SigTracer, start::Int)
     return nothing
 end
 
-# After the first modular run the structure of every recorded tracer is read
-# only. The coefficients are not structure: they belong to the prime they were
-# computed with and are re-recorded on every later run, so they are dropped here
-# rather than left around to be picked up by mistake.
 function mark_recorded!(ts::TracerStore)
     ts.recorded && return nothing
     for tr in ts.tracers
@@ -207,8 +192,6 @@ function construct_matrix!(tr::SigTracer,
     # symbolic_pp! would normally have grown the pivots along with the columns
     resize_pivots!(mat, symbol_ht)
     finalize_matrix!(mat, symbol_ht, ind_order)
-    # put back the pivot marks exactly as they stood in the recorded run
-    @inbounds copyto!(mat.pivots, 1, tr_mat.pivots, 1, length(tr_mat.pivots))
     return mat
 end
 

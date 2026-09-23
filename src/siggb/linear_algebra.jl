@@ -15,10 +15,9 @@ function echelonize!(matrix::MacaulayMatrix,
 
     tr_mat = new_tr_mat(matrix.nrows, tr)
 
-    # record the pivot marks before any of them get overwritten below
-    if !is_complete(tr) && tr isa SigTracer
-        tr_mat.pivots = copy(matrix.pivots[1:matrix.ncols])
-    end
+    # echelonize! overwrites pivots as it reduces, so the marks symbolic_pp!
+    # left have to be read off before the loop starts
+    pre_pivots = copy(matrix.pivots[1:matrix.ncols])
 
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
@@ -38,10 +37,9 @@ function echelonize!(matrix::MacaulayMatrix,
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
 
-        # store tracer data. The row operations depend on the prime, so they are
-        # recorded on every run even when the structure is being replayed.
+        # store tracer data for module reconstruction
         add_row!(tr_mat, row_sig, row_ind, matrix.parent_inds[row_ind],
-                 pivots[l_col_idx] == row_ind)
+                 pre_pivots[l_col_idx] == row_ind)
 
         if pivots[l_col_idx] == row_ind
             continue
@@ -120,7 +118,7 @@ function echelonize!(matrix::MacaulayMatrix,
         store_inver!(tr_mat, row_ind, inver)
 
         # check if row lead reduced
-        @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1])
+        @inbounds if !is_complete(tr) && (isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1]))
             # TODO: not super happy with this check
             if !(row_ind in matrix.toadd[1:matrix.toadd_length])
                 matrix.toadd[matrix.toadd_length+1] = row_ind
@@ -135,10 +133,9 @@ function echelonize!(matrix::MacaulayMatrix,
         @info "$(arit_ops) submul's"
     end
 
-    # Which rows become basis elements is a property of the computation, not of
-    # the prime, so it is recorded once and replayed afterwards. Rows that are
-    # never reduced leave the loop above early and would otherwise be missed.
+    # Tracer knows which rows are added
     if is_complete(tr)
+        resize!(matrix.toadd, length(tr_mat.toadd))
         @inbounds for (k, row_ind) in enumerate(tr_mat.toadd)
             matrix.toadd[k] = row_ind
         end

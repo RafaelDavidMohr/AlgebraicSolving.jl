@@ -186,33 +186,19 @@ struct NoTracerMatrix <: TracerMatrix end
 
 # struct to remember the row reductions we did
 mutable struct SigTracerMatrix
-    # Row data indexed by the row's position in memory, so that replaying a
-    # tracer puts every row back where it was. This has to be ordered: the row
-    # indices in `col_inds_and_coeffs`, `is_basis_row` and `toadd` all refer to
-    # these positions, and a Dict would hand the rows back in an arbitrary
-    # order. Each entry is the row's signature, the basis index it came from,
-    # and whether symbolic_pp! had already marked it as a pivot, i.e. it is a
-    # reducer rather than a row to be reduced. That flag matters when replaying
-    # because echelonize! skips pivot rows before reaching the `toadd` check.
+    # row signature, basis index row came from, whether it was premarked as a pivot
     rows::Vector{Tuple{Sig, Int, Bool}}
-    # signature to row index, for the lookups that go the other way
+    # signature to row index
     sig_to_row::Dict{Sig, Int}
     # first index row index, second index basis index where new element is stored
     is_basis_row::Dict{Int, Int}
     row_ind_to_sig::Dict{Int, Sig} # row signatures
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
-    # degree selected for this matrix, needed when replaying a tracer because
-    # the degree normally comes out of select_normal!
+    # degree selected for this matrix
     deg::Exp
-    # rows that went into the basis. Replaying reuses this rather than redoing
-    # the lead reduction check, which only sees rows that were actually reduced.
+    # rows that went into the basis
     toadd::Vector{Int}
-    # the pivot marks symbolic_pp! left, as they stand when echelonize! starts.
-    # They cannot be rebuilt from a per row flag because echelonize! overwrites
-    # pivots while it reduces, so a mark can be gone by the time its row is
-    # reached.
-    pivots::Vector{Int}
 end
 
 abstract type Tracer end
@@ -288,14 +274,10 @@ end
 
 RandCoeffs() = RandCoeffs(Int[], 1)
 
-# Tracers of the components visited by sig_decomp!, one entry per component, in
-# the order in which the components are processed. The first modular run records
-# them, every later one replays them to skip select_normal!/symbolic_pp!. This
-# is well defined because a good prime splits in exactly the same way, the same
-# assumption that lets the registry match up polynomials across primes.
-# `ranges` says which of a tracer's matrices belong to which component: a hull
-# component keeps growing its parent's tracer, so one tracer can back several
-# entries here.
+# Tracers of the components visited by sig_decomp!, one entry per
+# component, in the order in which the components are processed.
+# `ranges` says which of a tracer's matrices belong to which
+# component.
 mutable struct TracerStore
     tracers::Vector{SigTracer}
     ranges::Vector{UnitRange{Int}}

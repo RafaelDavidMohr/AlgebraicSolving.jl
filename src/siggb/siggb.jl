@@ -326,11 +326,11 @@ function sig_decomp!(basis::Basis{N},
             @info "splitting component"
             tim = @elapsed lc_set_hull, bs2, ps2, tgs2,
                            ind_ord2, lc_set_nz, tr2, tr_hull = split!(bs, basis_ht,
-                                                             zd_mons, zd_coeffs,
-                                                             tr, ps,
-                                                             zd_ind, tgs,
-                                                             ind_ord,
-                                                             lc_set, r)
+                                                                      zd_mons, zd_coeffs,
+                                                                      tr, ps,
+                                                                      zd_ind, tgs,
+                                                                      ind_ord,
+                                                                      lc_set, r)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr_hull))
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
@@ -374,15 +374,12 @@ function siggb_for_split!(basis::Basis{N},
         end
     end
 
-    # When replaying we rebuild every matrix straight from the tracer, which
-    # skips select_normal!/symbolic_pp! and with them all pair handling, so the
-    # recorded matrix indices rather than the pairset drive the loop.
     replaying = !isempty(replay)
     mat_idx = first(replay)
 
     while true
         local deg::Exp
-        if replaying
+        if replaying # rerun tracer
             mat_idx > last(replay) && break
             symbol_ht = initialize_secondary_hash_table(basis_ht)
             tr.curr_mat = mat_idx
@@ -391,7 +388,7 @@ function siggb_for_split!(basis::Basis{N},
             timer.sym_pp_time += tim
             deg = tr.mats[mat_idx].deg
             mat_idx += 1
-        else
+        else # normal symbolic preprocessing/reduction loop
             iszero(pairset.load) && break
 
 	    matrix = initialize_matrix(Val(N))
@@ -414,10 +411,10 @@ function siggb_for_split!(basis::Basis{N},
         # remember the degree, it is not recoverable without select_normal!
         !replaying && (last(tr.mats).deg = deg)
 
-        time = @elapsed update_siggb!(timer, basis, matrix, pairset,
-                                      symbol_ht, basis_ht,
-                                      ind_order, tags,
-                                      tr, char, syz_queue)
+        tim = @elapsed update_siggb!(timer, basis, matrix, pairset,
+                                     symbol_ht, basis_ht,
+                                     ind_order, tags,
+                                     tr, char, syz_queue)
         timer.update_time += tim
 
         # find minimum syzygy index
