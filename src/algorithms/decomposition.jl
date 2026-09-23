@@ -109,7 +109,6 @@ function _equidimensional_decomposition(I::Ideal{T},
             end
                 
             cells = _sig_decomp(sys_mons, sys_coeffs, basis_ht, char, shift, parent(first(Fhomp)), r)
-            # from here on the tracers of this run are replayed, not rebuilt
             mark_recorded!(r.tracers)
             if ispow2(cnt)
                 @logmsg INFOONE "decomposition $cnt with prime $p, $(length(findall(p -> all(p.is_stable), r.pols))) / $(length(r.pols)) polynomials reconstructed"

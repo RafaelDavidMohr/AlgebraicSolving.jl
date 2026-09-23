@@ -408,7 +408,7 @@ function siggb_for_split!(basis::Basis{N},
         tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift, tr)
         timer.lin_alg_time += tim
 
-        # remember the degree, it is not recoverable without select_normal!
+        # remember the degree
         !replaying && (last(tr.mats).deg = deg)
 
         tim = @elapsed update_siggb!(timer, basis, matrix, pairset,
@@ -497,9 +497,7 @@ function split!(basis::Basis{N},
             ord_ind, _ = findmin((i -> ind_order.ord[i]).(ge_deg_inds))
         end
 
-        # insert zd in system. The hull carries on with a shifted copy so that
-        # the matrices recorded before this split keep the basis indices they
-        # were recorded with and stay replayable.
+        # insert zd in system 
         tr_hull = copy_tracer(tr)
         s_ind = add_new_sequence_element!(basis, basis_ht, tr_hull,
                                           cofac_coeffs, cofac_mons_hsh,
