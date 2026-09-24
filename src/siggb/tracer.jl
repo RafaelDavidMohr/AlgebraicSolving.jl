@@ -135,7 +135,23 @@ function shift_tracer!(tr::SigTracer, shift::Int,
     end
 end                
 
-reset_tracers!(ts::TracerStore) = ts.ind = 1
+function reset_tracers!(ts::TracerStore)
+    ts.ind = 1
+    ts.syz_ind = 1
+end
+
+function record_syz_split!(ts::TracerStore, found::Bool, queue_ind::Int,
+                           cofac_ind::SigIndex, to_del::Vector{Int})
+    push!(ts.syz_splits, SyzSplit(found, queue_ind, cofac_ind, copy(to_del)))
+    ts.syz_ind += 1
+    return nothing
+end
+
+function next_syz_split!(ts::TracerStore)
+    res = ts.syz_splits[ts.syz_ind]
+    ts.syz_ind += 1
+    return res
+end
 
 is_replaying(ts::TracerStore) = ts.recorded
 

@@ -274,6 +274,15 @@ end
 
 RandCoeffs() = RandCoeffs(Int[], 1)
 
+# which syz_queue entry and which cofactor index produced the zero divisor in
+# one call of process_syz_for_split!, traced in multimodular equidim
+struct SyzSplit
+    found::Bool
+    queue_ind::Int
+    cofac_ind::SigIndex
+    to_del::Vector{Int}
+end
+
 # Tracers of the components visited by sig_decomp!, one entry per
 # component, in the order in which the components are processed.
 # `ranges` says which of a tracer's matrices belong to which
@@ -283,9 +292,11 @@ mutable struct TracerStore
     ranges::Vector{UnitRange{Int}}
     ind::Int
     recorded::Bool
+    syz_splits::Vector{SyzSplit}
+    syz_ind::Int
 end
 
-TracerStore() = TracerStore(SigTracer[], UnitRange{Int}[], 1, false)
+TracerStore() = TracerStore(SigTracer[], UnitRange{Int}[], 1, false, SyzSplit[], 1)
 
 mutable struct ReconstructRegistry <: Registry
     R::QQMPolyRing

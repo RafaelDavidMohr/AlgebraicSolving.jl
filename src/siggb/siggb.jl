@@ -315,7 +315,7 @@ function sig_decomp!(basis::Basis{N},
                                            basis_ht, tr,
                                            syz_queue,
                                            char, shift, lc_set,
-                                           timer, replay_rng)
+                                           timer, ts, replay_rng)
 
         if is_replaying(ts)
             finish_replay!(ts)
@@ -354,6 +354,7 @@ function siggb_for_split!(basis::Basis{N},
                           shift::Cbuf,
                           lc_set::LocClosedSet,
                           timer::Timings,
+                          ts::TracerStore,
                           replay::UnitRange{Int} = 1:0) where N
 
     splitting_inds = [index(basis.sigs[i]) for i in 1:basis.input_load]
@@ -431,7 +432,7 @@ function siggb_for_split!(basis::Basis{N},
                 cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
                                                                basis, tr, ind_order, char, lc_set,
                                                                tags, splitting_inds,
-                                                               timer)
+                                                               timer, ts)
                 if does_split
                     return true, false, cofac_coeffs,
                     cofac_mons, cofac_ind
@@ -447,7 +448,7 @@ function siggb_for_split!(basis::Basis{N},
         cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
                                            basis, tr, ind_order, char, lc_set,
                                            tags, splitting_inds,
-                                           timer)
+                                           timer, ts)
         if does_split
             return true, false, cofac_coeffs,
             cofac_mons, cofac_ind
@@ -525,7 +526,8 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                                 lc_set::LocClosedSet,
                                 tags::Tags,
                                 splitting_inds::Vector{SigIndex},
-                                timer::Timings) where N
+                                timer::Timings,
+                                ts::TracerStore) where N
     
     @info "checking known syzygies"
     found_zd = false
@@ -533,7 +535,28 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
     zd_mons_hsh = MonIdx[]
     zd_ind = zero(SigIndex)
 
+    # A later run already knows which queue entry and which cofactor index
+    # produced the zero divisor
+    if is_replaying(ts)
+        rec = next_syz_split!(ts)
+        if rec.found
+            idx, _ = syz_queue[rec.queue_ind]
+            syz_mask = basis.syz_masks[idx]
+            syz_mon = basis.syz_sigs[idx]
+            tim = @elapsed zd_coeffs, zd_mons_hsh =
+                construct_module_wrap((index(syz_mask), syz_mon), basis, basis_ht,
+                                      tr.syz_ind_to_mat[idx], tr, char,
+                                      ind_order, rec.cofac_ind)
+            timer.module_time += tim
+            found_zd = true
+            zd_ind = rec.cofac_ind
+        end
+        deleteat!(syz_queue, rec.to_del)
+        return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
+    end
+
     to_del = Int[]
+    queue_ind = 0
 
     @inbounds for (i, (idx, proc_info)) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
@@ -561,6 +584,7 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                 found_zd = true
                 zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
+                queue_ind = i
                 break
             else
                 continue
@@ -571,6 +595,7 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
         end    
     end
 
+    record_syz_split!(ts, found_zd, queue_ind, zd_ind, to_del)
     deleteat!(syz_queue, to_del)
 
     return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
