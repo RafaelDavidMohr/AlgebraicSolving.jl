@@ -118,7 +118,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
         push!(outp, (sig, pol))
     end
 
-    return sort(outp, by = ((sig, pol), ) -> sig)
+    return outp
 end
 
 #---------------- function for sig_groebner_basis --------------------#
