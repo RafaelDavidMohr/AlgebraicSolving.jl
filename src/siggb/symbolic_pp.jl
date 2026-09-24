@@ -19,9 +19,9 @@ function select_normal!(pairset::Pairset{N},
             deg = mod_ord == :DPOT ? pe.deg : monomial(pe.top_sig).deg
             sigind = index(pe.top_sig)
             npairs += 1
-            continue
-        end
-        if !should_select(pairset, i, deg, sigind, mod_ord)
+        elseif should_select(pairset, i, deg, sigind, mod_ord)
+            npairs += 1
+        else
             break
         end
     end
